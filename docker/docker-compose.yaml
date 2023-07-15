@@ -1,0 +1,45 @@
+version: '2.1'
+
+services:
+  recommendations-t2s-service-db-node-01:
+    build:
+      context: ./mysql/recommendations_t2s_db
+      dockerfile: Dockerfile
+    container_name: recommendations-t2s-service-db-node-01
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: t2s_db_node_01
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin
+      MYSQL_ROOT_PASSWORD: '1'
+    command: >
+      --sql-mode='STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'
+      --default-authentication-plugin=mysql_native_password
+      --general-log=ON
+      --log-queries-not-using-indexes=ON
+    networks:
+      - arch-network
+    ports:
+      - 3360:3306
+    volumes:
+      - recommendations-t2s-service-db-node-01-data:/var/lib/mysql
+
+  recommendations-system-t2s-service:
+    build:
+      context: recommendations_system_t2s
+      dockerfile: Dockerfile
+    container_name: recommendations_system_t2s
+    ports:
+      - 8080:8080
+    networks:
+      - arch-network
+    depends_on:
+      - recommendations-t2s-service-db-node-01
+
+volumes:
+  recommendations-t2s-service-db-node-01-data:
+
+networks:
+  arch-network:
+    driver: "bridge"
+    external: false
