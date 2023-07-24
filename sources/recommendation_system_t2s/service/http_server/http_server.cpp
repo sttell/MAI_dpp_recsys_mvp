@@ -5,6 +5,8 @@
 #include "Poco/DateTimeFormat.h"
 
 #include "../database/database.hpp"
+#include "../database/student.hpp"
+#include "../database/student_indexer.hpp"
 
 #include "handlers/include/handlers/request_handler_factory.hpp"
 
@@ -45,6 +47,10 @@ namespace recsys_t2s {
                 return EXIT_DATAERR;
             }
         }
+
+        database::Student::Init();
+        database::StudentIndex::Init();
+
         std::cout << "Connected." << std::endl;
 
         ServerSocket svs( SocketAddress(*network_config->GetIpAddress(), *network_config->GetPort()));

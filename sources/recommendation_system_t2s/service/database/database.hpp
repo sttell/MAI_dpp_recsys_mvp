@@ -3,6 +3,8 @@
 
 #include <memory>
 
+#include "common/id.hpp"
+
 #include "Poco/Data/Session.h"
 #include "Poco/Data/SessionPool.h"
 
@@ -26,6 +28,8 @@ namespace recsys_t2s::database {
         bool TryConnect();
 
         inline bool IsConnected() const noexcept { return m_IsConnected; }
+
+        static common::ID SelectLastInsertedID();
 
         Session CreateSession();
 

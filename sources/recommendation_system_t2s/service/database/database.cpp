@@ -47,6 +47,21 @@ namespace recsys_t2s::database {
         return false;
     }
 
+    common::ID Database::SelectLastInsertedID() {
+        int database_id{ common::ID::None };
+
+        Session session = Database().Instance()->CreateSession();
+
+        Poco::Data::Statement select(session);
+
+        select << "SELECT LAST_INSERT_ID()", into(database_id), range(0, 1);
+        if (!select.done()) {
+            select.execute();
+        }
+
+        return {database_id};
+    }
+
     Poco::Data::Session Database::CreateSession(){
         return Poco::Data::Session(m_Pool->get());
     }

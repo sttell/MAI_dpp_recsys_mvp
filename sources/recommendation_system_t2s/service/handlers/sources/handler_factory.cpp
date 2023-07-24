@@ -1,6 +1,8 @@
 #include "handlers/include/handlers/handler_factory.hpp"
 
 #include "base_handler/base_request_handler.hpp"
+#include "team_handler/team_request_handler.hpp"
+#include "student_handler/student_request_handler.hpp"
 
 #include "../../common/errors.hpp"
 
@@ -39,8 +41,10 @@ namespace recsys_t2s::handlers {
         }
 
         switch( type.value()) {
-            case HandlerType::Student:
             case HandlerType::Team:
+                return new impl::TeamRequestHandler(t_format);
+            case HandlerType::Student:
+                return new impl::StudentRequestHandler(t_format);
             case HandlerType::Base:
             case HandlerType::_count_: { /* Pass */ }
         }

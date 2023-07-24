@@ -2,6 +2,7 @@
 #define RECOMMENDATION_SYSTEM_BASE_REQUEST_HANDLER_HPP
 
 #include "handlers/include/handlers/i_request_handler.hpp"
+#include "handlers/sources/html_form/html_form.hpp"
 
 namespace recsys_t2s::handlers::impl {
 
@@ -33,6 +34,10 @@ namespace recsys_t2s::handlers::impl {
 
         /* 500 */
         void SetInternalErrorResponse( HTTPServerResponseBase& response, const std::string& description ) override;
+
+        bool ValidateRequestHasField(
+                HTMLForm& form, HTTPServerResponseBase& response, const char* field_key
+        );
 
     };
 

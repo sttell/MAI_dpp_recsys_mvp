@@ -155,4 +155,18 @@ namespace recsys_t2s::handlers::impl {
         Poco::JSON::Stringifier::stringify(root, ostr);
     }
 
+    bool BaseRequestHandler::ValidateRequestHasField(
+            HTMLForm& t_form,
+            recsys_t2s::handlers::IRequestHandler::HTTPServerResponseBase& t_response,
+            const char* t_field_key
+    ) {
+
+        if ( !t_form.has(t_field_key) ) {
+            SetBadRequestResponse(t_response, std::string{"Request require the field ["} + t_field_key + "]");
+            return false;
+        }
+
+        return true;
+    }
+
 } // namespace recsys_t2s::handlers::impl

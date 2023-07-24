@@ -34,8 +34,13 @@ add_executable(${EXECUTABLE_NAME}
         service/handlers/sources/request_handler_factory.cpp
         service/handlers/sources/base_handler/base_request_handler.cpp
         service/handlers/sources/handler_factory.cpp
+        service/handlers/sources/team_handler/team_request_handler.cpp
+        service/handlers/sources/html_form/html_form.cpp
+        service/handlers/sources/student_handler/student_request_handler.cpp
 
         service/database/database.cpp
+        service/database/student.cpp
+        service/database/student_indexer.cpp
 
         service/config/server_config.cpp
         service/config/path_validate.cpp
