@@ -124,9 +124,37 @@ namespace recsys_t2s::handlers::impl {
     }
 
     void StudentRequestHandler::HandleDeleteRequest(
-            recsys_t2s::handlers::IRequestHandler::HTTPServerRequestBase&,
-            recsys_t2s::handlers::IRequestHandler::HTTPServerResponseBase &t_response) {
-        BaseRequestHandler::SetInternalErrorResponse(t_response, "DELETE Not implemented");
+            recsys_t2s::handlers::IRequestHandler::HTTPServerRequestBase& t_request,
+            recsys_t2s::handlers::IRequestHandler::HTTPServerResponseBase& t_response) {
+
+        HTMLForm form(t_request);
+
+        if (!ValidateRequestHasField(form, t_response, "student_id")) return;
+        auto opt_student_id = form.getValue<unsigned int>("student_id");
+        if ( !opt_student_id.has_value() ) {
+            SetBadRequestResponse(t_response, "Invalid data: unrecognized student id data type.");
+            return;
+        }
+
+        auto [status, deleted_id] = database::Student::DeleteByExternalID(common::ID(opt_student_id.value()));
+
+        if ( status != database::DatabaseStatus::OK ) {
+            BaseRequestHandler::SetBadRequestResponse(t_response, status.GetMessage());
+            return;
+        }
+
+        t_response.setStatus(Poco::Net::HTTPResponse::HTTPStatus::HTTP_OK);
+        t_response.setChunkedTransferEncoding(true);
+        t_response.setContentType("application/json");
+        Poco::JSON::Object::Ptr root = new Poco::JSON::Object();
+        root->set("type", "/success");
+        root->set("title", "OK");
+        root->set("status", Poco::Net::HTTPResponse::HTTP_REASON_OK);
+        root->set("instance", "/user");
+        root->set("id", deleted_id.value().AsString());
+        std::ostream &ostr = t_response.send();
+        Poco::JSON::Stringifier::stringify(root, ostr);
+
     }
 
     void

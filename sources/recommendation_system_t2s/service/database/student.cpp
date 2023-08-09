@@ -51,8 +51,7 @@ using Poco::Data::Transaction;
 #define DELETE_BY_EXTERNAL_ID_REQUEST \
     "DELETE "              \
     "FROM " TABLE_NAME " " \
-    "WHERE external_id=? " \
-    "RETURNING id"
+    "WHERE external_id=?"
 
 #define INSERT_STUDENT_REQUEST               \
     "INSERT INTO " TABLE_NAME " "            \
@@ -290,19 +289,23 @@ namespace recsys_t2s::database {
     optional_with_status<common::ID> Student::DeleteByExternalID(const common::ID& t_external_id) {
         Student student;
 
-        common::ID::id_type deleted_id;
         try {
 
             Session session = database::Database::Instance()->CreateSession();
 
-            Statement select_statement(session);
+            Statement delete_statement(session);
 
             std::string ext_id_str = t_external_id.AsString();
-            select_statement << DELETE_BY_EXTERNAL_ID_REQUEST, use(ext_id_str), into(deleted_id), now;
-            size_t selected_count = select_statement.execute();
+            delete_statement << DELETE_BY_EXTERNAL_ID_REQUEST, use(ext_id_str);
+            size_t deleted_cnt = delete_statement.execute();
 
-            if ( selected_count == 0 || deleted_id == common::ID::None ) {
-                return std::make_pair(DatabaseStatus::OK, std::make_optional<common::ID>());
+            if ( deleted_cnt == 0 ) {
+                std::string message{ "Student with ID " };
+                message += t_external_id.AsString() + " not exists.";
+                return std::make_pair(
+                        DatabaseStatus{ DatabaseStatus::ERROR_NOT_EXISTS, message },
+                        std::make_optional<common::ID>()
+                );
             }
 
         } catch ( Poco::Data::MySQL::ConnectionException& e ) {
@@ -313,7 +316,7 @@ namespace recsys_t2s::database {
             return std::make_pair(DatabaseStatus{ DatabaseStatus::ERROR_STATEMENT, e.displayText() }, std::make_optional<common::ID>());
         }
 
-        return std::make_pair(DatabaseStatus::OK, deleted_id);
+        return std::make_pair(DatabaseStatus::OK, t_external_id);
     }
 
     optional_with_status<common::ID> Student::UpdateStudent(const recsys_t2s::database::Student &updated,
