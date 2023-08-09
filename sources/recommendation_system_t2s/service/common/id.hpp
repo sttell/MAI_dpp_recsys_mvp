@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <string>
 
 namespace recsys_t2s::common {
 
@@ -25,7 +26,7 @@ namespace recsys_t2s::common {
 
         constexpr bool operator<( const ID& rhs ) { return (m_IsNone) ? false : (m_ID < rhs); }
 
-        std::string AsString() const {
+        [[nodiscard]] std::string AsString() const {
             return std::to_string(m_ID);
         }
 

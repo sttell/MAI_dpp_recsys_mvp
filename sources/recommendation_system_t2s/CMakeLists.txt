@@ -41,6 +41,7 @@ add_executable(${EXECUTABLE_NAME}
         service/database/database.cpp
         service/database/student.cpp
         service/database/student_indexer.cpp
+        service/database/student_indexer.hpp
 
         service/config/server_config.cpp
         service/config/path_validate.cpp

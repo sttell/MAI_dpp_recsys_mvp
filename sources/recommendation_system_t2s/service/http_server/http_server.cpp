@@ -49,7 +49,6 @@ namespace recsys_t2s {
         }
 
         database::Student::Init();
-        database::StudentIndex::Init();
 
         std::cout << "Connected." << std::endl;
 

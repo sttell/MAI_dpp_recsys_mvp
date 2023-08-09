@@ -20,59 +20,54 @@ using Poco::Data::Transaction;
 #define TABLE_NAME "Students"
 #define CREATE_TABLE_REQUEST                                              \
     "CREATE TABLE IF NOT EXISTS `" TABLE_NAME "` "                        \
-    "(`id` "                "INT "         "NOT NULL " "AUTO_INCREMENT,"  \
-    "`external_id` "        "INT "         "NOT NULL,"                    \
-    "`program_id` "         "INT "         "NOT NULL,"                    \
-    "`team_id` "            "INT "         "NOT NULL,"                    \
-    "`index_id` "           "INT "         "NOT NULL,"                    \
-    "`academic_group` "     "VARCHAR(32) " "NOT NULL,"                    \
-    "`institute_id` "       "TINYINT "     "NOT NULL,"                    \
-    "`education_level_id` " "TINYINT "     "NOT NULL,"                    \
-    "`education_course` "   "TINYINT "     "NOT NULL,"                    \
-    "`age` "                "TINYINT "     "NOT NULL,"                    \
-    "`is_have_team` "       "BOOLEAN "     "NOT NULL,"                    \
-    "`is_it` "              "BOOLEAN "     "NOT NULL,"                    \
-    "`add_datetime` "       "DATETIME "    "DEFAULT CURRENT_TIMESTAMP, "  \
-    "`last_update` "        "DATETIME "    "DEFAULT CURRENT_TIMESTAMP, "  \
+    "(`id` "                  "INT "         "NOT NULL " "AUTO_INCREMENT,"  \
+    "`external_id` "          "INT "         "NOT NULL,"                    \
+    "`program_id` "           "INT "         "NOT NULL,"                    \
+    "`team_id` "              "INT "         "NOT NULL,"                    \
+    "`descriptor` "           "BLOB "        "NOT NULL,"                    \
+    "`is_have_team` "         "BOOLEAN "     "NOT NULL,"                    \
+    "`add_datetime` "         "DATETIME "    "DEFAULT CURRENT_TIMESTAMP, "  \
+    "`last_update_datetime` " "DATETIME "    "DEFAULT CURRENT_TIMESTAMP, "  \
     "PRIMARY KEY (`id`), "                                                \
     "KEY `ext_id` (`external_id`),"                                     \
-    "KEY `tm_id`  (`team_id`),"                                         \
-    "KEY `idx_id` (`index_id`)"                                         \
+    "KEY `tm_id`  (`team_id`)"                                         \
     ");"
 
-#define ALL_FIELDS \
-        "external_id, program_id, team_id, index_id, academic_group, institute_id, education_level_id, education_course, age, is_have_team, is_it"
-
 #define SELECT_CHECK_BY_EXTERNAL_ID_REQUEST \
-    "SELECT id FROM " TABLE_NAME " WHERE external_id=?"
+    "SELECT id "\
+    "FROM " TABLE_NAME " " \
+    "WHERE external_id=?"
 
 #define SELECT_BY_ID_REQUEST \
-    "SELECT " ALL_FIELDS " FROM " TABLE_NAME " WHERE id=?"
+    "SELECT external_id, program_id, team_id, descriptor, is_have_team, add_datetime, last_update_datetime " \
+    "FROM " TABLE_NAME " " \
+    "WHERE id=?"
 
 #define SELECT_BY_EXTERNAL_ID_REQUEST \
-    "SELECT " ALL_FIELDS " FROM " TABLE_NAME " WHERE external_id=?"
+    "SELECT external_id, program_id, team_id, descriptor, is_have_team, add_datetime, last_update_datetime " \
+    "FROM " TABLE_NAME " " \
+    "WHERE external_id=?"
 
 #define DELETE_BY_EXTERNAL_ID_REQUEST \
-    "DELETE FROM " TABLE_NAME " WHERE external_id=? RETURNING id"
+    "DELETE "              \
+    "FROM " TABLE_NAME " " \
+    "WHERE external_id=? " \
+    "RETURNING id"
 
 #define INSERT_STUDENT_REQUEST               \
     "INSERT INTO " TABLE_NAME " "            \
-    "(" ALL_FIELDS ") "                      \
-    "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "(external_id, program_id, team_id, descriptor, is_have_team) "                      \
+    "VALUES(?, ?, ?, ?, ?)"
 
 #define UPDATE_STUDENT_REQUEST      \
     "UPDATE " TABLE_NAME " SET "    \
     "external_id=? "                \
     "program_id=? "                 \
     "team_id=? "                    \
-    "index_id=? "                   \
-    "academic_group=? "             \
-    "institute_id=? "               \
-    "education_level_id=? "         \
-    "education_course=? "           \
-    "age=? "                        \
+    "descriptor=? "                   \
     "is_have_team=? "               \
-    "is_it=? WHERE external_id=?"
+    "last_update_datetime=NOW() "                                \
+    "WHERE external_id=?"
 
 namespace recsys_t2s::database {
 
@@ -97,7 +92,7 @@ namespace recsys_t2s::database {
         return DatabaseStatus{ DatabaseStatus::OK };
     }
 
-    DatabaseStatus Student::InsertToDatabase() {
+    DatabaseStatus Student::InsertToDatabase(const StudentIndex& index) {
 
         {
             auto [status, is_exists] = Student::CheckIfExistsByExternalID(m_ExternalID);
@@ -113,23 +108,13 @@ namespace recsys_t2s::database {
             }
         }
 
-
-
-
-        /* Add index to database */
-        // TODO: Add transaction
-        StudentIndex student_index;
-        {
-            auto [status, opt_student_index] = database::StudentIndex::AddStudentIndex(*this);
-
-            if (status != DatabaseStatus::OK) {
-                return status;
-            }
-
-            student_index = opt_student_index.value();
+        try {
+            m_Descriptor = index.CreateDescriptor();
+        } catch (const std::exception& e) {
+            std::string message{ "Failed to create descriptor for student with ID: " };
+            message += std::to_string(m_ExternalID) + ", because: " + e.what();
+            return DatabaseStatus{ DatabaseStatus::ERROR_CREATE_INDEX };
         }
-
-        this->m_IndexID = student_index.GetID();
 
         try {
             Session session = Database::Instance()->CreateSession();
@@ -138,31 +123,24 @@ namespace recsys_t2s::database {
             std::string ext_id_str = m_ExternalID.AsString();
             std::string program_id_str = m_ProgramID.AsString();
             std::string team_id_str = m_TeamID.AsString();
-            std::string index_id_str = m_IndexID.AsString();
-            std::string academic_group = m_AcademicGroup;
-            std::string institute_id_str = m_InstituteId.AsString();
-            std::string education_level_str = m_EducationLevel.AsString();
-            std::string education_course_str = m_EducationCourse.AsString();
-            std::string age = std::to_string(m_Age);
+            auto* data = reinterpret_cast<unsigned char*>(m_Descriptor.data());
+            Poco::Data::BLOB blob(data, m_Descriptor.size() * sizeof(float));
             std::string is_have_team_str = std::to_string(m_IsHaveTeam);
-            std::string is_it_str = std::to_string(m_IsItStudent);
+
+            if ( m_IsHaveTeam ) {
+                return DatabaseStatus{ DatabaseStatus::ERROR_CREATE_INDEX, "Student have a team" };
+            }
 
             insert_statement << std::string(INSERT_STUDENT_REQUEST),
-                                use(ext_id_str),
-                                use(program_id_str),
-                                use(team_id_str),
-                                use(index_id_str),
-                                use(academic_group),
-                                use(institute_id_str),
-                                use(education_level_str),
-                                use(education_course_str),
-                                use(age),
-                                use(is_have_team_str),
-                                use(is_it_str);
+                    use(ext_id_str),
+                    use(program_id_str),
+                    use(team_id_str),
+                    use(blob),
+                    use(is_have_team_str);
 
             insert_statement.execute();
             m_ID = Database::SelectLastInsertedID();
-            
+
         } catch ( Poco::Data::MySQL::StatementException& e ) {
 
             std::cerr << "Statement Error while insert student: " << e.displayText() << std::endl;
@@ -225,26 +203,16 @@ namespace recsys_t2s::database {
             common::ID::id_type external_id;
             common::ID::id_type program_id;
             common::ID::id_type team_id;
-            common::ID::id_type index_id;
-            common::ID::id_type institute_id;
-            common::ID::id_type education_level_id;
-            int8_t education_course;
-            int32_t age;
+            Poco::Data::BLOB descriptor_blob;
             bool is_have_team;
-            bool is_it;
 
             select_statement << SELECT_BY_ID_REQUEST, 
                                 use(id_str),
                                 into(external_id),
                                 into(program_id),
                                 into(team_id),
-                                into(index_id),
-                                into(institute_id),
-                                into(education_level_id),
-                                into(education_course),
-                                into(age),
+                                into(descriptor_blob),
                                 into(is_have_team),
-                                into(is_it),
                                 now;
 
             size_t selected_count = select_statement.execute();
@@ -256,13 +224,8 @@ namespace recsys_t2s::database {
             student.m_ExternalID = external_id;
             student.m_ProgramID = program_id;
             student.m_TeamID = team_id;
-            student.m_IndexID = index_id;
-            student.m_InstituteId = institute_id;
-            student.m_EducationLevel = static_cast<common::EducationLevel::Type>(education_level_id);
-            student.m_EducationCourse = education_course;
-            student.m_Age = age;
             student.m_IsHaveTeam = is_have_team;
-            student.m_IsItStudent = is_it;
+            std::copy(descriptor_blob.begin(), descriptor_blob.end(), student.m_Descriptor.begin());
 
         } catch ( Poco::Data::MySQL::ConnectionException& e ) {
             std::cerr << "Connection to database error: " << e.displayText() << std::endl;
@@ -289,26 +252,16 @@ namespace recsys_t2s::database {
             common::ID::id_type external_id;
             common::ID::id_type program_id;
             common::ID::id_type team_id;
-            common::ID::id_type index_id;
-            common::ID::id_type institute_id;
-            common::ID::id_type education_level_id;
-            int8_t education_course;
-            int32_t age;
+            Poco::Data::BLOB descriptor_blob;
             bool is_have_team;
-            bool is_it;
 
             select_statement << SELECT_BY_EXTERNAL_ID_REQUEST,
                                 use(ext_id_str),
                                 into(external_id),
                                 into(program_id),
                                 into(team_id),
-                                into(index_id),
-                                into(institute_id),
-                                into(education_level_id),
-                                into(education_course),
-                                into(age),
+                                into(descriptor_blob),
                                 into(is_have_team),
-                                into(is_it),
                                 now;
 
             size_t selected_count = select_statement.execute();
@@ -320,13 +273,8 @@ namespace recsys_t2s::database {
             student.m_ExternalID = external_id;
             student.m_ProgramID = program_id;
             student.m_TeamID = team_id;
-            student.m_IndexID = index_id;
-            student.m_InstituteId = institute_id;
-            student.m_EducationLevel = static_cast<common::EducationLevel::Type>(education_level_id);
-            student.m_EducationCourse = education_course;
-            student.m_Age = age;
             student.m_IsHaveTeam = is_have_team;
-            student.m_IsItStudent = is_it;
+            std::copy(descriptor_blob.begin(), descriptor_blob.end(), student.m_Descriptor.begin());
 
         } catch ( Poco::Data::MySQL::ConnectionException& e ) {
             std::cerr << "Connection to database error: " << e.displayText() << std::endl;
@@ -368,7 +316,8 @@ namespace recsys_t2s::database {
         return std::make_pair(DatabaseStatus::OK, deleted_id);
     }
 
-    optional_with_status<common::ID> Student::UpdateStudent(const recsys_t2s::database::Student &updated) {
+    optional_with_status<common::ID> Student::UpdateStudent(const recsys_t2s::database::Student &updated,
+                                                            [[maybe_unused]] const recsys_t2s::database::StudentIndex &index) {
 
         auto [status, exists_student] = Student::SearchByExternalID(updated.m_ExternalID);
         if ( status != DatabaseStatus::OK  ) {
@@ -379,42 +328,36 @@ namespace recsys_t2s::database {
 
         try {
 
-            Session session = database::Database::Instance()->CreateSession();
+            // Not implemented
 
-            Statement update_statement(session);
+            return std::make_pair(DatabaseStatus::ERROR_NOT_IMPLEMENTED, std::make_optional<common::ID>());
 
-            std::string ext_id_str = updated.m_ExternalID.AsString();
-
-            common::ID::id_type external_id;
-            common::ID::id_type program_id;
-            common::ID::id_type team_id;
-            common::ID::id_type index_id;
-            common::ID::id_type institute_id;
-            common::ID::id_type education_level_id;
-            int8_t education_course;
-            int32_t age;
-            bool is_have_team;
-            bool is_it;
-
-            update_statement << UPDATE_STUDENT_REQUEST,
-                                use(ext_id_str),
-                                into(external_id),
-                                into(program_id),
-                                into(team_id),
-                                into(index_id),
-                                into(institute_id),
-                                into(education_level_id),
-                                into(education_course),
-                                into(age),
-                                into(is_have_team),
-                                into(is_it),
-                                now;
-
-            size_t selected_count = update_statement.execute();
-
-            if ( selected_count == 0 ) {
-                return std::make_pair(DatabaseStatus::OK, std::make_optional<common::ID>());
-            }
+//            Session session = database::Database::Instance()->CreateSession();
+//
+//            Statement update_statement(session);
+//
+//            std::string ext_id_str = updated.m_ExternalID.AsString();
+//
+//            common::ID::id_type external_id;
+//            common::ID::id_type program_id;
+//            common::ID::id_type team_id;
+//            Poco::Data::BLOB index_blob;
+//            bool is_have_team;
+//
+//            update_statement << UPDATE_STUDENT_REQUEST,
+//                                use(ext_id_str),
+//                                into(external_id),
+//                                into(program_id),
+//                                into(team_id),
+//                                into(index_blob),
+//                                into(is_have_team),
+//                                now;
+//
+//            size_t selected_count = update_statement.execute();
+//
+//            if ( selected_count == 0 ) {
+//                return std::make_pair(DatabaseStatus::OK, std::make_optional<common::ID>());
+//            }
 
         } catch ( Poco::Data::MySQL::ConnectionException& e ) {
             std::cerr << "Connection to database error: " << e.displayText() << std::endl;

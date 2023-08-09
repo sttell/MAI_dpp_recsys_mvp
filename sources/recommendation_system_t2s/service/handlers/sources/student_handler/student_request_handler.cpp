@@ -1,5 +1,6 @@
 #include "student_request_handler.hpp"
 
+#include "database/student_indexer.hpp"
 #include "database/student.hpp"
 
 namespace recsys_t2s::handlers::impl {
@@ -85,18 +86,24 @@ namespace recsys_t2s::handlers::impl {
         if ( !opt_age.has_value() ) { SetBadRequestResponse(t_response, "Invalid data: unrecognized age data type."); return; }
         if ( !opt_it_status.has_value() ) { SetBadRequestResponse(t_response, "Invalid data: unrecognized it status data type."); return; }
 
+        database::StudentIndex student_indexer;
+
+        student_indexer.SetExternalID(opt_student_id.value());
+        student_indexer.SetProgramID(opt_program_id.value());
+        student_indexer.SetInstituteId(opt_institute.value());
+        student_indexer.SetEducationLevel(opt_education_level.value());
+        student_indexer.SetAcademicGroup(opt_academic_group.value());
+        student_indexer.SetEducationCourse(opt_education_course.value());
+        student_indexer.SetAge(static_cast<int>(opt_age.value()));
+        student_indexer.SetIsItStudent(opt_it_status.value());
+
         database::Student student;
+        student.SetExternalID(opt_student_id.value());
+        student.SetProgramID(opt_program_id.value());
+        student.SetTeamID(common::ID::None);
+        student.SetIsHaveTeam(false);
 
-        student.ExternalID() = common::ID(opt_student_id.value());
-        student.ProgramID() = common::ID(opt_program_id.value());
-        student.InstituteId() = common::InstituteID(opt_institute.value());
-        student.EducationLevel() = common::EducationLevel(opt_education_level.value());
-        student.AcademicGroup() = opt_academic_group.value();
-        student.EducationCourse() = opt_education_course.value();
-        student.Age() = static_cast<int>(opt_age.value());
-        student.IsItStudent() = opt_it_status.value();
-
-        auto status = student.InsertToDatabase();
+        auto status = student.InsertToDatabase(student_indexer);
 
         if ( status != database::DatabaseStatus::OK ) {
             BaseRequestHandler::SetBadRequestResponse( t_response, status.GetMessage() );

@@ -15,6 +15,8 @@ namespace recsys_t2s::database {
             ERROR_STATEMENT,
             ERROR_CONNECTION,
             ERROR_NOT_EXISTS,
+            ERROR_CREATE_INDEX,
+            ERROR_NOT_IMPLEMENTED,
             _count_,
         };
 

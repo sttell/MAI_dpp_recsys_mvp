@@ -1,41 +1,40 @@
 #ifndef RECOMMENDATION_SYSTEM_STUDENT_INDEXER_HPP
 #define RECOMMENDATION_SYSTEM_STUDENT_INDEXER_HPP
 
-#include "database.hpp"
-#include "student.hpp"
-
+#include "common/id.hpp"
+#include "common/institute_id.hpp"
+#include "common/education_level.hpp"
+#include "common/education_course.hpp"
 #include <vector>
+
+#define ADD_FIELD(type, name, default_value) \
+    private:                                         \
+        type m_##name{ default_value };  \
+    public:                                      \
+        type Get##name() const noexcept { return m_##name; } \
+        void Set##name(const type& value) { m_##name = value; }
 
 namespace recsys_t2s::database {
 
+    using StudentDescriptor = std::array<float, 19>;
+
     class StudentIndex {
-        friend class Database;
     public:
 
-        static constexpr size_t index_size = 19;
-        using index_vector_t = std::array<float, index_size>;
+        [[nodiscard]] StudentDescriptor CreateDescriptor() const;
 
-        StudentIndex() = default;
-        StudentIndex(StudentIndex&& user) = default;
-        StudentIndex(const StudentIndex& user) = default;
-        StudentIndex& operator=(StudentIndex&& user) = default;
-        StudentIndex& operator=(const StudentIndex& user) = default;
 
-        common::ID GetID() const noexcept { return m_ID; };
-        index_vector_t GetVector() const noexcept { return m_Vector; };
+        ADD_FIELD(common::ID, ExternalID, common::ID::None);
+        ADD_FIELD(common::ID, ProgramID, common::ID::None);
+        ADD_FIELD(common::ID, TeamID, common::ID::None);
+        ADD_FIELD(common::ID, IndexID, common::ID::None);
+        ADD_FIELD(common::InstituteID, InstituteId, common::InstituteID::None);
+        ADD_FIELD(common::EducationLevel, EducationLevel, common::EducationLevel::None);
+        ADD_FIELD(common::EducationCourse, EducationCourse, common::EducationCourse::None);
+        ADD_FIELD(std::string, AcademicGroup, {});
+        ADD_FIELD(int, Age, 0);
+        ADD_FIELD(bool, IsItStudent, false);
 
-        common::ID& ID() noexcept { return m_ID; };
-        index_vector_t& Vector() noexcept { return m_Vector; };
-
-        static DatabaseStatus Init();
-
-        static optional_with_status<StudentIndex> AddStudentIndex(const Student& student);
-        static optional_with_status<common::ID> SearchIndexByExternalID(const common::ID& external_id);
-        static optional_with_status<StudentIndex> UpdateStudentIndex(const Student& student, bool is_guaranted_exists=false);
-
-    private:
-        common::ID m_ID;
-        index_vector_t m_Vector;
     };
 
 } // namespace recsys_t2s::database
