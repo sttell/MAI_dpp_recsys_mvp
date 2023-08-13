@@ -60,11 +60,11 @@ using Poco::Data::Transaction;
 
 #define UPDATE_STUDENT_REQUEST      \
     "UPDATE " TABLE_NAME " SET "    \
-    "external_id=? "                \
-    "program_id=? "                 \
-    "team_id=? "                    \
-    "descriptor=? "                   \
-    "is_have_team=? "               \
+    "external_id=?, "                \
+    "program_id=?, "                 \
+    "team_id=?, "                    \
+    "descriptor=?, "                   \
+    "is_have_team=?, "               \
     "last_update_datetime=NOW() "                                \
     "WHERE external_id=?"
 
@@ -112,7 +112,7 @@ namespace recsys_t2s::database {
         } catch (const std::exception& e) {
             std::string message{ "Failed to create descriptor for student with ID: " };
             message += std::to_string(m_ExternalID) + ", because: " + e.what();
-            return DatabaseStatus{ DatabaseStatus::ERROR_CREATE_INDEX };
+            return DatabaseStatus{ DatabaseStatus::ERROR_CREATE_INDEX, message };
         }
 
         try {
@@ -320,47 +320,51 @@ namespace recsys_t2s::database {
     }
 
     optional_with_status<common::ID> Student::UpdateStudent(const recsys_t2s::database::Student &updated,
-                                                            [[maybe_unused]] const recsys_t2s::database::StudentIndex &index) {
+                                                            const recsys_t2s::database::StudentIndex &index) {
 
-        auto [status, exists_student] = Student::SearchByExternalID(updated.m_ExternalID);
+        auto [status, opt_exists_student] = Student::SearchByExternalID(updated.m_ExternalID);
         if ( status != DatabaseStatus::OK  ) {
             return std::make_pair(status, std::make_optional<common::ID>());
-        } else if ( !exists_student.has_value() ) {
+        } else if ( !opt_exists_student.has_value() ) {
             return std::make_pair(DatabaseStatus::ERROR_NOT_EXISTS, std::make_optional<common::ID>());
+        }
+
+        auto& exists_student = opt_exists_student.value();
+
+        StudentDescriptor descriptor;
+        try {
+            descriptor = index.CreateDescriptor();
+        } catch (const std::exception& e) {
+            std::string message{ "Failed to create descriptor for student with ID: " };
+            message += std::to_string(updated.m_ExternalID) + ", because: " + e.what();
+            return std::make_pair(DatabaseStatus{ DatabaseStatus::ERROR_CREATE_INDEX, message }, std::make_optional<common::ID>());
         }
 
         try {
 
-            // Not implemented
+            Session session = database::Database::Instance()->CreateSession();
+            Statement update_statement(session);
 
-            return std::make_pair(DatabaseStatus::ERROR_NOT_IMPLEMENTED, std::make_optional<common::ID>());
+            common::ID::id_type external_id = updated.m_ExternalID;
+            common::ID::id_type program_id  = updated.m_ProgramID;
+            common::ID::id_type team_id = updated.m_TeamID;
+            auto* data = reinterpret_cast<unsigned char*>(descriptor.data());
+            Poco::Data::BLOB blob(data, descriptor.size() * sizeof(float));
+            bool is_have_team = exists_student.m_IsHaveTeam;
 
-//            Session session = database::Database::Instance()->CreateSession();
-//
-//            Statement update_statement(session);
-//
-//            std::string ext_id_str = updated.m_ExternalID.AsString();
-//
-//            common::ID::id_type external_id;
-//            common::ID::id_type program_id;
-//            common::ID::id_type team_id;
-//            Poco::Data::BLOB index_blob;
-//            bool is_have_team;
-//
-//            update_statement << UPDATE_STUDENT_REQUEST,
-//                                use(ext_id_str),
-//                                into(external_id),
-//                                into(program_id),
-//                                into(team_id),
-//                                into(index_blob),
-//                                into(is_have_team),
-//                                now;
-//
-//            size_t selected_count = update_statement.execute();
-//
-//            if ( selected_count == 0 ) {
-//                return std::make_pair(DatabaseStatus::OK, std::make_optional<common::ID>());
-//            }
+            update_statement << UPDATE_STUDENT_REQUEST,
+                                use(external_id),
+                                use(program_id),
+                                use(team_id),
+                                use(blob),
+                                use(is_have_team),
+                                use(external_id);
+
+            size_t updated_cnt = update_statement.execute();
+
+            if ( updated_cnt == 0 ) {
+                return std::make_pair(DatabaseStatus{DatabaseStatus::ERROR_NOT_EXISTS, ""}, std::make_optional<common::ID>());
+            }
 
         } catch ( Poco::Data::MySQL::ConnectionException& e ) {
             std::cerr << "Connection to database error: " << e.displayText() << std::endl;
