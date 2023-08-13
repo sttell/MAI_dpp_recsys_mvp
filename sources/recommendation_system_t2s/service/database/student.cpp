@@ -110,12 +110,16 @@ namespace recsys_t2s::database {
         try {
             m_Descriptor = index.CreateDescriptor();
         } catch (const std::exception& e) {
-            std::string message{ "Failed to create descriptor for student with ID: " };
-            message += std::to_string(m_ExternalID) + ", because: " + e.what();
+            std::string message{
+                "Failed to create descriptor for student with ID: " +
+                std::to_string(m_ExternalID) +
+                ", because: " +
+                e.what()
+            };
             return DatabaseStatus{ DatabaseStatus::ERROR_CREATE_INDEX, message };
         }
 
-        try {
+        START_STATEMENT_SECTION
             Session session = Database::Instance()->CreateSession();
             Statement insert_statement(session);
 
@@ -140,17 +144,7 @@ namespace recsys_t2s::database {
             insert_statement.execute();
             m_ID = Database::SelectLastInsertedID();
 
-        } catch ( Poco::Data::MySQL::StatementException& e ) {
-
-            std::cerr << "Statement Error while insert student: " << e.displayText() << std::endl;
-            return DatabaseStatus{ DatabaseStatus::ERROR_STATEMENT, e.displayText() };
-
-        } catch ( Poco::Data::MySQL::ConnectionException& e ) {
-
-            std::cerr << "Connection Error while insert student: " << e.displayText() << std::endl;
-            return DatabaseStatus{ DatabaseStatus::ERROR_CONNECTION, e.displayText() };
-
-        }
+        END_STATEMENT_SECTION_WITH_STATUS
 
         return DatabaseStatus{ DatabaseStatus::OK };
 
@@ -191,7 +185,7 @@ namespace recsys_t2s::database {
 
         Student student;
 
-        try {
+        START_STATEMENT_SECTION
 
             Session session = database::Database::Instance()->CreateSession();
 
@@ -226,21 +220,15 @@ namespace recsys_t2s::database {
             student.m_IsHaveTeam = is_have_team;
             std::copy(descriptor_blob.begin(), descriptor_blob.end(), student.m_Descriptor.begin());
 
-        } catch ( Poco::Data::MySQL::ConnectionException& e ) {
-            std::cerr << "Connection to database error: " << e.displayText() << std::endl;
-            return std::make_pair(DatabaseStatus{ DatabaseStatus::ERROR_CONNECTION, e.displayText() }, std::make_optional<Student>());
-        } catch ( Poco::Data::MySQL::StatementException& e ) {
-            std::cerr << "Statement exception while init to database: " << e.displayText() << std::endl;
-            return std::make_pair(DatabaseStatus{ DatabaseStatus::ERROR_STATEMENT, e.displayText() }, std::make_optional<Student>());
-        }
+        END_STATEMENT_SECTION_WITH_OPT(Student)
 
-        return std::make_pair(DatabaseStatus::OK, student);
+        return OPT_WITH_STATUS_OK(student);
     }
 
     optional_with_status<Student> Student::SearchByExternalID(const common::ID& t_external_id) {
         Student student;
 
-        try {
+        START_STATEMENT_SECTION
 
             Session session = database::Database::Instance()->CreateSession();
 
@@ -275,13 +263,7 @@ namespace recsys_t2s::database {
             student.m_IsHaveTeam = is_have_team;
             std::copy(descriptor_blob.begin(), descriptor_blob.end(), student.m_Descriptor.begin());
 
-        } catch ( Poco::Data::MySQL::ConnectionException& e ) {
-            std::cerr << "Connection to database error: " << e.displayText() << std::endl;
-            return std::make_pair(DatabaseStatus{ DatabaseStatus::ERROR_CONNECTION, e.displayText() }, std::make_optional<Student>());
-        } catch ( Poco::Data::MySQL::StatementException& e ) {
-            std::cerr << "Statement exception while init to database: " << e.displayText() << std::endl;
-            return std::make_pair(DatabaseStatus{ DatabaseStatus::ERROR_STATEMENT, e.displayText() }, std::make_optional<Student>());
-        }
+        END_STATEMENT_SECTION_WITH_OPT(Student)
 
         return std::make_pair(DatabaseStatus::OK, student);
     }
@@ -289,10 +271,9 @@ namespace recsys_t2s::database {
     optional_with_status<common::ID> Student::DeleteByExternalID(const common::ID& t_external_id) {
         Student student;
 
-        try {
+        START_STATEMENT_SECTION
 
             Session session = database::Database::Instance()->CreateSession();
-
             Statement delete_statement(session);
 
             std::string ext_id_str = t_external_id.AsString();
@@ -300,33 +281,24 @@ namespace recsys_t2s::database {
             size_t deleted_cnt = delete_statement.execute();
 
             if ( deleted_cnt == 0 ) {
-                std::string message{ "Student with ID " };
-                message += t_external_id.AsString() + " not exists.";
-                return std::make_pair(
-                        DatabaseStatus{ DatabaseStatus::ERROR_NOT_EXISTS, message },
-                        std::make_optional<common::ID>()
-                );
+                std::string message{ "Student with ID " + t_external_id.AsString() + "not_exists." };
+                return OPT_WITH_STATUS_ERR(ERROR_NOT_EXISTS, message, common::ID);
             }
 
-        } catch ( Poco::Data::MySQL::ConnectionException& e ) {
-            std::cerr << "Connection to database error: " << e.displayText() << std::endl;
-            return std::make_pair(DatabaseStatus{ DatabaseStatus::ERROR_CONNECTION, e.displayText() }, std::make_optional<common::ID>());
-        } catch ( Poco::Data::MySQL::StatementException& e ) {
-            std::cerr << "Statement exception while init to database: " << e.displayText() << std::endl;
-            return std::make_pair(DatabaseStatus{ DatabaseStatus::ERROR_STATEMENT, e.displayText() }, std::make_optional<common::ID>());
-        }
+        END_STATEMENT_SECTION_WITH_OPT(common::ID)
 
-        return std::make_pair(DatabaseStatus::OK, t_external_id);
+        return OPT_WITH_STATUS_OK(t_external_id);
     }
 
     optional_with_status<common::ID> Student::UpdateStudent(const recsys_t2s::database::Student &updated,
                                                             const recsys_t2s::database::StudentIndex &index) {
 
         auto [status, opt_exists_student] = Student::SearchByExternalID(updated.m_ExternalID);
-        if ( status != DatabaseStatus::OK  ) {
-            return std::make_pair(status, std::make_optional<common::ID>());
+        if ( status != DatabaseStatus::OK ) {
+            return OPT_WITH_STATUS(status, std::make_optional<common::ID>());
         } else if ( !opt_exists_student.has_value() ) {
-            return std::make_pair(DatabaseStatus::ERROR_NOT_EXISTS, std::make_optional<common::ID>());
+            std::string message{ "Student with ID " + updated.m_ExternalID.AsString() + " not exists." };
+            return OPT_WITH_STATUS_ERR(ERROR_NOT_EXISTS, message, common::ID);
         }
 
         auto& exists_student = opt_exists_student.value();
@@ -335,12 +307,16 @@ namespace recsys_t2s::database {
         try {
             descriptor = index.CreateDescriptor();
         } catch (const std::exception& e) {
-            std::string message{ "Failed to create descriptor for student with ID: " };
-            message += std::to_string(updated.m_ExternalID) + ", because: " + e.what();
-            return std::make_pair(DatabaseStatus{ DatabaseStatus::ERROR_CREATE_INDEX, message }, std::make_optional<common::ID>());
+            std::string message{
+                "Failed to create descriptor for student with ID: " +
+                updated.m_ExternalID.AsString() +
+                ", because: " +
+                e.what()
+            };
+            return OPT_WITH_STATUS_ERR(ERROR_CREATE_INDEX, message, common::ID);
         }
 
-        try {
+        START_STATEMENT_SECTION
 
             Session session = database::Database::Instance()->CreateSession();
             Statement update_statement(session);
@@ -363,18 +339,13 @@ namespace recsys_t2s::database {
             size_t updated_cnt = update_statement.execute();
 
             if ( updated_cnt == 0 ) {
-                return std::make_pair(DatabaseStatus{DatabaseStatus::ERROR_NOT_EXISTS, ""}, std::make_optional<common::ID>());
+                std::string message{ "Student with ID " + updated.m_ExternalID.AsString() + " not exists." };
+                return OPT_WITH_STATUS_ERR(ERROR_NOT_EXISTS, message, common::ID);
             }
 
-        } catch ( Poco::Data::MySQL::ConnectionException& e ) {
-            std::cerr << "Connection to database error: " << e.displayText() << std::endl;
-            return std::make_pair(DatabaseStatus{ DatabaseStatus::ERROR_CONNECTION, e.displayText() }, std::make_optional<common::ID>());
-        } catch ( Poco::Data::MySQL::StatementException& e ) {
-            std::cerr << "Statement exception while init to database: " << e.displayText() << std::endl;
-            return std::make_pair(DatabaseStatus{ DatabaseStatus::ERROR_STATEMENT, e.displayText() }, std::make_optional<common::ID>());
-        }
+        END_STATEMENT_SECTION_WITH_OPT(common::ID)
 
-        return std::make_pair(DatabaseStatus::OK, std::make_optional<common::ID>(updated.m_ExternalID));
+        return OPT_WITH_STATUS_OK(updated.m_ExternalID);
     }
 
 } // namespace recsys_t2s::database

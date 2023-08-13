@@ -12,12 +12,10 @@
 
 #include "student_indexer.hpp"
 
-#include "database_status.hpp"
+#include "common/optional_with_status.hpp"
 
 namespace recsys_t2s::database {
 
-    template<typename T>
-    using optional_with_status = std::pair<DatabaseStatus, std::optional<T>>;
 
     class Student {
         friend class Database;
