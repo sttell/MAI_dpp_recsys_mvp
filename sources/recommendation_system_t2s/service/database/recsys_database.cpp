@@ -174,8 +174,14 @@ namespace recsys_t2s::database {
             }
 
             team.SetStudentExternalIndices(student_indices);
-            team.LoadStudents();
-            team.UpdateDescriptor();
+            DatabaseStatus load_students_status = team.LoadStudents();
+
+            if ( load_students_status != DatabaseStatus::OK )
+                return OPT_WITH_STATUS(load_students_status, std::nullopt);
+
+            auto [is_updated, reason] = team.UpdateDescriptor();
+            if ( !is_updated )
+                return OPT_WITH_STATUS_ERR(ERROR_CREATE_DESCRIPTOR, reason.value(), Team);
 
         START_STATEMENT_SECTION
 
@@ -230,9 +236,9 @@ namespace recsys_t2s::database {
             std::string in_institute_id = student.GetInstituteId().AsString();
             std::string in_education_level = student.GetEducationLevel().AsString();
             std::string in_education_course = student.GetEducationCourse().AsString();
-            std::string in_academic_group = student.GetAcademicGroup();
-            std::string in_age = std::to_string(student.GetAge());
-            std::string in_is_it = std::to_string(student.GetIsItStudent());
+            std::string in_academic_group = student.GetAcademicGroup().GetValue();
+            std::string in_age = std::to_string(student.GetAge().GetValue());
+            std::string in_is_it = std::to_string(student.GetIsItStudent().GetValue());
 
             std::string insert_student_statement{ "INSERT INTO " STUDENTS_TABLE_NAME " (external_id, program_id, team_id, descriptor, institute_id, education_level, education_course, academic_group, age, is_it_student) " };
             insert_student_statement += "VALUES(" + in_external_id + ", ";
@@ -289,16 +295,19 @@ namespace recsys_t2s::database {
         return OPT_WITH_STATUS_OK(true);
     }
 
-    optional_with_status<common::ID> RecSysDatabase::InsertTeam(const recsys_t2s::database::Team &team) {
+    DatabaseStatus RecSysDatabase::InsertTeam(const recsys_t2s::database::Team &team) {
 
         DatabaseStatus load_students_status = team.LoadStudents();
-        if ( load_students_status != DatabaseStatus::OK ) {
-            return OPT_WITH_STATUS(load_students_status, std::make_optional<common::ID>());
-        }
+        if ( load_students_status != DatabaseStatus::OK )
+            return load_students_status;
+
 
         auto [ is_created, opt_message ] = team.UpdateDescriptor();
         if (!is_created)
-            return OPT_WITH_STATUS_ERR(ERROR_CREATE_DESCRIPTOR, opt_message.value(), common::ID);
+            return {
+                DatabaseStatus::ERROR_CREATE_DESCRIPTOR,
+                opt_message.value()
+            };
 
         common::ID inserted_id;
         START_STATEMENT_SECTION
@@ -330,11 +339,9 @@ namespace recsys_t2s::database {
 
             transaction.commit();
 
-            inserted_id = Database::SelectLastInsertedID();
+        END_STATEMENT_SECTION_WITH_STATUS
 
-        END_STATEMENT_SECTION_WITH_OPT(common::ID)
-
-        return OPT_WITH_STATUS_OK(inserted_id);
+        return DatabaseStatus::OK;
 
     }
 
@@ -468,16 +475,17 @@ namespace recsys_t2s::database {
         return DatabaseStatus::OK;
     }
 
-    optional_with_status<common::ID> RecSysDatabase::UpdateTeam(recsys_t2s::database::Team new_team) {
+    DatabaseStatus RecSysDatabase::UpdateTeam(recsys_t2s::database::Team new_team) {
 
         auto [ search_team_status, is_exists ] = CheckIfExistsTeamByExternalID(new_team.GetExternalID());
         if ( search_team_status != DatabaseStatus::OK ) {
-            return OPT_WITH_STATUS(search_team_status, std::make_optional<common::ID>());
+            return search_team_status;
         }
         if ( !is_exists.value() ) {
-            return OPT_WITH_STATUS_ERR(ERROR_NOT_EXISTS,
-                                       "Team with ID " + new_team.GetExternalID().AsString() + " not exists.",
-                                       common::ID);
+            return {
+                DatabaseStatus::ERROR_NOT_EXISTS,
+                "Team with ID " + new_team.GetExternalID().AsString() + " not exists.",
+            };
         }
 
         common::ID updated_id;
@@ -495,15 +503,148 @@ namespace recsys_t2s::database {
 
             statement.execute();
 
-            updated_id = new_team.GetExternalID();
+        END_STATEMENT_SECTION_WITH_STATUS
 
-        END_STATEMENT_SECTION_WITH_OPT(common::ID)
-
-        return OPT_WITH_STATUS_OK(updated_id);
+        return DatabaseStatus::OK;
     }
 
-    optional_with_status<common::ID> RecSysDatabase::UpdateStudent(recsys_t2s::database::Student /*new_student*/) {
-        return OPT_WITH_STATUS_OK(-1);
+    DatabaseStatus
+    RecSysDatabase::UpdateStudent(recsys_t2s::database::Student new_student, const std::map<std::string, bool>& fields_in_form) {
+
+        auto [ search_status, opt_student ] = SearchStudentByExternalID(new_student.GetExternalID());
+        if ( search_status != DatabaseStatus::OK )
+            return search_status;
+
+        if ( !fields_in_form.count("program_id") ) new_student.SetProgramID(opt_student->GetProgramID());
+        if ( !fields_in_form.count("team_id") ) new_student.SetTeamID(opt_student->GetTeamID());
+        if ( !fields_in_form.count("institute") ) new_student.SetInstituteId(opt_student->GetInstituteId());
+        if ( !fields_in_form.count("education_course") ) new_student.SetEducationCourse(opt_student->GetEducationCourse());
+        if ( !fields_in_form.count("education_level") ) new_student.SetEducationLevel(opt_student->GetEducationLevel());
+        if ( !fields_in_form.count("academic_group") ) new_student.SetAcademicGroup(opt_student->GetAcademicGroup());
+        if ( !fields_in_form.count("age") ) new_student.SetAge(opt_student->GetAge());
+        if ( !fields_in_form.count("it_status") ) new_student.SetIsItStudent(opt_student->GetIsItStudent());
+
+        auto [is_updated, reason] = new_student.UpdateDescriptor();
+        if ( !is_updated ) {
+            return {DatabaseStatus::ERROR_CREATE_DESCRIPTOR, reason.value()};
+        }
+
+        // external_id, program_id, team_id, descriptor, institute_id, education_level, education_course, academic_group, age, is_it_student
+        bool is_update_program_id = new_student.GetProgramID() != opt_student->GetProgramID();
+        bool is_update_team_id = new_student.GetTeamID() != opt_student->GetTeamID();
+        bool is_update_institute_id = new_student.GetInstituteId() != opt_student->GetInstituteId();
+        bool is_update_education_level = new_student.GetEducationLevel() != opt_student->GetEducationLevel();
+        bool is_update_education_course = new_student.GetEducationCourse() != opt_student->GetEducationCourse();
+        bool is_update_academic_group = new_student.GetAcademicGroup() != opt_student->GetAcademicGroup();
+        bool is_update_age = new_student.GetAge() != opt_student->GetAge();
+        bool is_update_is_it_student = new_student.GetIsItStudent() != opt_student->GetIsItStudent();
+
+        std::optional<Team> old_team;
+        std::optional<Team> new_team;
+
+        bool is_old_has_team = opt_student->GetTeamID() != recsys_t2s::common::ID::None;
+        bool is_new_has_team = new_student.GetTeamID() != recsys_t2s::common::ID::None;
+
+        if ( is_old_has_team && is_update_team_id ) {
+
+            auto [ status, opt_team ] = SearchTeamByExternalID(opt_student->GetTeamID());
+            if ( status != DatabaseStatus::OK )
+                return status;
+            old_team = opt_team;
+
+        }
+        if ( is_new_has_team && is_update_team_id ) {
+
+            auto [ status, opt_team ] = SearchTeamByExternalID(new_student.GetTeamID());
+            if ( status != DatabaseStatus::OK )
+                return status;
+            new_team = opt_team;
+
+        }
+
+        if ( is_old_has_team && old_team->GetStudents().size() == 1 ) {
+            return {
+                DatabaseStatus::ERROR_BAD_REQUEST,
+                "Command " +
+                    old_team->GetExternalID().AsString() +
+                    " will remain empty. Pre-delete command " +
+                    old_team->GetExternalID().AsString() + "."
+            };
+        }
+
+        START_STATEMENT_SECTION
+
+        Session session = Database::Instance()->CreateSession();
+        Transaction transaction(session);
+
+        std::string update_statement{ "UPDATE " STUDENTS_TABLE_NAME " SET " };
+
+        std::vector<std::string> updated_fields;
+        if ( is_update_program_id )
+            updated_fields.emplace_back("program_id=" + new_student.GetProgramID().AsString());
+        if ( is_update_team_id )
+            updated_fields.emplace_back("team_id=" + new_student.GetTeamID().AsString());
+        if ( is_update_institute_id )
+            updated_fields.emplace_back("institute_id=" + new_student.GetInstituteId().AsString());
+        if ( is_update_education_level )
+            updated_fields.emplace_back("education_level=" + new_student.GetEducationLevel().AsString());
+        if ( is_update_education_course )
+            updated_fields.emplace_back("education_course=" + new_student.GetEducationCourse().AsString());
+        if ( is_update_academic_group )
+            updated_fields.emplace_back("academic_group=\"" + new_student.GetAcademicGroup().GetValue() + "\"");
+        if ( is_update_age )
+            updated_fields.emplace_back("age=" + std::to_string(new_student.GetAge().GetValue()));
+        if ( is_update_is_it_student )
+            updated_fields.emplace_back("is_it_student=" + std::to_string(new_student.GetIsItStudent().GetValue()));
+
+        updated_fields.emplace_back("descriptor=" + DescriptorToHexBlob(new_student.GetDescriptor()));
+        updated_fields.emplace_back("last_update_datetime=NOW()");
+
+        for ( size_t i = 0; i < updated_fields.size() - 1; ++i ) {
+            update_statement += updated_fields[i] + ", ";
+        }
+
+        update_statement += updated_fields.back();
+        update_statement += " WHERE external_id=" + new_student.GetExternalID().AsString();
+
+        transaction.execute(update_statement, false);
+
+        // Вышел из старой команды
+        if ( is_update_team_id && is_old_has_team ) {
+
+            old_team->RemoveExistsStudent(new_student.GetExternalID(), opt_student->GetDescriptor());
+
+            std::string update_team_statement{ "UPDATE " TEAMS_TABLE_NAME " SET "};
+            if ( new_student.GetExternalID() == old_team->GetTeamLeadID() ) {
+                update_team_statement += "team_lead_id=" + std::to_string(common::ID::None) + ", ";
+            }
+            update_team_statement += "descriptor=" + DescriptorToHexBlob(old_team->GetDescriptor()) + ", ";
+            update_team_statement += "last_update_datetime=NOW() ";
+            update_team_statement += "WHERE external_id=" + old_team->GetExternalID().AsString();
+
+            transaction.execute(update_team_statement, false);
+
+        }
+
+        // Во всех случаях обновляем дескриптор в текущей команде
+        if ( is_new_has_team ) {
+
+            new_team->AppendExistsStudent(new_student.GetExternalID(), new_student.GetDescriptor());
+
+            std::string update_team_statement{ "UPDATE " TEAMS_TABLE_NAME " SET "};
+            update_team_statement += "descriptor=" + DescriptorToHexBlob(new_team->GetDescriptor()) + ", ";
+            update_team_statement += "last_update_datetime=NOW() ";
+            update_team_statement += "WHERE external_id=" + new_team->GetExternalID().AsString();
+
+            transaction.execute(update_team_statement, false);
+
+        }
+
+        transaction.commit();
+
+        END_STATEMENT_SECTION_WITH_STATUS
+
+        return DatabaseStatus::OK;
     }
 
 } // namespace recsys_t2s::database

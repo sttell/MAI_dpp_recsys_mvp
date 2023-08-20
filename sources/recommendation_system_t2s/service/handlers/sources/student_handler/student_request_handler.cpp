@@ -153,17 +153,11 @@ namespace recsys_t2s::handlers::impl {
         HTMLForm form(t_request);
 
         if (!ValidateRequestHasField(form, t_response, "student_id")) return;
-        if (!ValidateRequestHasField(form, t_response, "program_id")) return;
-        if (!ValidateRequestHasField(form, t_response, "institute")) return;
-        if (!ValidateRequestHasField(form, t_response, "education_level")) return;
-        if (!ValidateRequestHasField(form, t_response, "academic_group")) return;
-        if (!ValidateRequestHasField(form, t_response, "education_course")) return;
-        if (!ValidateRequestHasField(form, t_response, "age")) return;
-        if (!ValidateRequestHasField(form, t_response, "it_status")) return;
 
         auto opt_student_id = form.getValue<unsigned int>("student_id");
         auto opt_program_id = form.getValue<unsigned int>("program_id");
         auto opt_institute = form.getValue<std::string>("institute");
+        auto opt_team_id = form.getValue<int>("team_id");
         auto opt_education_level = form.getValue<std::string>("education_level");
         auto opt_academic_group = form.getValue<std::string>("academic_group");
         auto opt_education_course = form.getValue<int8_t>("education_course");
@@ -171,30 +165,33 @@ namespace recsys_t2s::handlers::impl {
         auto opt_it_status = form.getValue<bool>("it_status");
 
         if ( !opt_student_id.has_value() ) { SetBadRequestResponse(t_response, "Invalid data: unrecognized student id data type."); return; }
-        if ( !opt_program_id.has_value() ) { SetBadRequestResponse(t_response, "Invalid data: unrecognized program id data type."); return; }
-        if ( !opt_institute.has_value() ) { SetBadRequestResponse(t_response, "Invalid data: unrecognized institute data type."); return; }
-        if ( !opt_education_level.has_value() ) { SetBadRequestResponse(t_response, "Invalid data: unrecognized education level data type."); return; }
-        if ( !opt_academic_group.has_value() ) { SetBadRequestResponse(t_response, "Invalid data: unrecognized academic group data type."); return; }
-        if ( !opt_education_course.has_value() ) { SetBadRequestResponse(t_response, "Invalid data: unrecognized education course data type."); return; }
-        if ( !opt_age.has_value() ) { SetBadRequestResponse(t_response, "Invalid data: unrecognized age data type."); return; }
-        if ( !opt_it_status.has_value() ) { SetBadRequestResponse(t_response, "Invalid data: unrecognized it status data type."); return; }
 
         database::Student student;
         student.SetExternalID(opt_student_id.value());
-        student.SetProgramID(opt_program_id.value());
-        student.SetInstituteId(opt_institute.value());
-        student.SetEducationLevel(opt_education_level.value());
-        student.SetAcademicGroup(opt_academic_group.value());
-        student.SetEducationCourse(opt_education_course.value());
-        student.SetAge(static_cast<int>(opt_age.value()));
-        student.SetIsItStudent(opt_it_status.value());
 
-        auto [status, student_id] = database::RecSysDatabase::UpdateStudent(student);
+        if ( opt_program_id.has_value() ) student.SetProgramID(opt_program_id.value());
+        if ( opt_institute.has_value() ) student.SetInstituteId(opt_institute.value());
+        if ( opt_education_level.has_value() ) student.SetEducationLevel(opt_education_level.value());
+        if ( opt_academic_group.has_value() ) student.SetAcademicGroup(opt_academic_group.value());
+        if ( opt_education_course.has_value() ) student.SetEducationCourse(opt_education_course.value());
+        if ( opt_age.has_value() ) student.SetAge(static_cast<int>(opt_age.value()));
+        if ( opt_it_status.has_value() ) student.SetIsItStudent(opt_it_status.value());
+        if ( opt_team_id.has_value() ) student.SetTeamID(opt_team_id.value());
 
-        if ( status != database::DatabaseStatus::OK ) {
-            BaseRequestHandler::SetBadRequestResponse( t_response, status.GetMessage() );
-            return;
-        }
+        std::map<std::string, bool> fields_in_form;
+        fields_in_form["student_id"] = form.has("student_id");
+        fields_in_form["program_id"] = form.has("program_id");
+        fields_in_form["institute"] = form.has("institute");
+        fields_in_form["team_id"] = form.has("team_id");
+        fields_in_form["education_level"] = form.has("education_level");
+        fields_in_form["academic_group"] = form.has("academic_group");
+        fields_in_form["education_course"] = form.has("education_course");
+        fields_in_form["age"] = form.has("age");
+        fields_in_form["it_status"] = form.has("it_status");
+
+        auto status = database::RecSysDatabase::UpdateStudent(student, fields_in_form);
+        if ( status != database::DatabaseStatus::OK )
+            HANDLER_RETURN_BAD_REQUEST(t_response, status.GetMessage());
 
         t_response.setStatus(Poco::Net::HTTPResponse::HTTPStatus::HTTP_OK);
         t_response.setChunkedTransferEncoding(true);
@@ -204,7 +201,6 @@ namespace recsys_t2s::handlers::impl {
         root->set("title", "OK");
         root->set("status", Poco::Net::HTTPResponse::HTTP_REASON_OK);
         root->set("instance", "/user");
-        root->set("id", student_id.value().AsString());
         std::ostream &ostr = t_response.send();
         Poco::JSON::Stringifier::stringify(root, ostr);
 

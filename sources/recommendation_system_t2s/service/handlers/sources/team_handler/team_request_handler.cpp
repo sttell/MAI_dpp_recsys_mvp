@@ -108,8 +108,7 @@ namespace recsys_t2s::handlers::impl {
         team.SetTeamLeadID(team_lead_id);
         team.SetStudentExternalIndices(students_id);
 
-        auto [status, inserted_id] = database::RecSysDatabase::InsertTeam(team);
-
+        auto status = database::RecSysDatabase::InsertTeam(team);
         if ( status != database::DatabaseStatus::OK )
             HANDLER_RETURN_BAD_REQUEST(t_response, status.GetMessage())
 
@@ -121,7 +120,6 @@ namespace recsys_t2s::handlers::impl {
         root->set("title", "OK");
         root->set("status", Poco::Net::HTTPResponse::HTTP_REASON_OK);
         root->set("instance", "/user");
-        root->set("id", inserted_id->AsString());
         std::ostream &ostr = t_response.send();
         Poco::JSON::Stringifier::stringify(root, ostr);
     }

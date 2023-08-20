@@ -1,5 +1,7 @@
 #include "team.hpp"
 
+#include <cassert>
+
 #include "recsys_database.hpp"
 #include <iostream>
 
@@ -22,7 +24,7 @@ namespace recsys_t2s::database {
         // Load team lead
         {
             auto [status, opt_student] = database::RecSysDatabase::SearchStudentByExternalID(m_TeamLeadID);
-            if (status != database::DatabaseStatus::OK)
+            if (status != database::DatabaseStatus::OK && status != database::DatabaseStatus::ERROR_NOT_EXISTS)
                 return {status.GetCode(), "Error while search Team Lead: " + status.GetMessage()};
         }
 
@@ -53,6 +55,10 @@ namespace recsys_t2s::database {
 
     std::pair<bool, std::optional<std::string>> Team::UpdateDescriptor() const {
 
+        assert(!m_Students.empty());
+
+        std::fill(m_Descriptor.begin(), m_Descriptor.end(), 0.f);
+
         /* Reduce */
         for ( auto& student : m_Students ) {
             auto current_student_descriptor = student.GetDescriptor();
@@ -67,15 +73,14 @@ namespace recsys_t2s::database {
             m_Descriptor[i] /= static_cast<float>(students_count);
         }
 
-        std::cout << "Team descriptor: " << std::endl;
-        for (size_t i = 0; i < DESCRIPTOR_LENGTH; i++) {
-            std::cout << "\t" << i << " -> " << m_Descriptor[i] << std::endl;
-        }
-
         return std::make_pair(true, std::make_optional<std::string>());
     }
 
     void Team::RemoveExistsStudent(const common::ID &id, const recsys_t2s::database::Descriptor &student_desc) {
+
+        assert(m_StudentExternalIndices.size() > 1);
+        assert(m_Students.size() == m_StudentExternalIndices.size());
+
         for ( size_t i = 0; i < DESCRIPTOR_LENGTH; ++i ) {
             m_Descriptor[i] *= static_cast<float>(m_StudentExternalIndices.size());
             m_Descriptor[i] -= student_desc[i];

@@ -18,6 +18,8 @@
 #include "student.hpp"
 #include "team.hpp"
 
+#include <map>
+
 namespace recsys_t2s::database {
 
 
@@ -29,8 +31,8 @@ namespace recsys_t2s::database {
         static DatabaseStatus Init();
 
         static DatabaseStatus InsertStudent(const Student& student);
-        static optional_with_status<common::ID> InsertTeam(const Team& team)
-        ;
+        static DatabaseStatus InsertTeam(const Team& team);
+
         static optional_with_status<bool> CheckIfExistsStudentByExternalID(const common::ID& id);
         static optional_with_status<bool> CheckIfExistsTeamByExternalID(const common::ID& id);
 
@@ -40,8 +42,8 @@ namespace recsys_t2s::database {
         static optional_with_status<Student> SearchStudentByExternalID(const common::ID& id);
         static optional_with_status<Team> SearchTeamByExternalID(const common::ID& id);
 
-        static optional_with_status<common::ID> UpdateStudent(Student new_student);
-        static optional_with_status<common::ID> UpdateTeam(Team new_team);
+        static DatabaseStatus UpdateStudent(Student new_student, const std::map<std::string, bool>& fields_in_form);
+        static DatabaseStatus UpdateTeam(Team new_team);
 
     };
 

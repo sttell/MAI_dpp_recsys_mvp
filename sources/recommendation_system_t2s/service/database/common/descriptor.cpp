@@ -3,6 +3,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <cstring>
+#include <vector>
 
 int hex_value(unsigned char hex_digit)
 {
@@ -31,13 +32,16 @@ int hex_value(unsigned char hex_digit)
 
 namespace recsys_t2s::database {
 
-    std::string DescriptorToHexBlob(const Descriptor& descriptor) {
+    std::string DescriptorToHexBlob(const Descriptor& descriptor, bool is_append_brackets) {
 
         static const char hex_digits[] = "0123456789ABCDEF";
 
         std::string output;
-        output.reserve(DESCRIPTOR_BYTES * 2 + 2);
-        output.push_back('\"');
+        output.reserve(((is_append_brackets) ? 2 : 0) + DESCRIPTOR_BYTES * 2);
+
+        if ( is_append_brackets )
+            output.push_back('\"');
+
         const auto* data = reinterpret_cast<const unsigned char*>(descriptor.data());
         for (size_t i = 0; i < DESCRIPTOR_BYTES; i++)
         {
@@ -45,7 +49,10 @@ namespace recsys_t2s::database {
             output.push_back(hex_digits[c >> 4]);
             output.push_back(hex_digits[c & 15]);
         }
-        output.push_back('\"');
+
+        if ( is_append_brackets )
+            output.push_back('\"');
+
         return output;
     }
 
@@ -53,17 +60,17 @@ namespace recsys_t2s::database {
         const auto len = blob.length();
         if (len & 1) throw std::invalid_argument("odd length");
 
-        std::string output;
-        output.reserve(len / 2);
+        std::vector<unsigned char> bytes;
+        bytes.reserve(len / 2);
         for (auto it = blob.begin(); it != blob.end(); )
         {
             int hi = hex_value(*it++);
             int lo = hex_value(*it++);
-            output.push_back(hi << 4 | lo);
+            bytes.push_back(hi << 4 | lo);
         }
 
         Descriptor descriptor;
-        std::memcpy(descriptor.data(), output.data(), DESCRIPTOR_BYTES);
+        std::memcpy(descriptor.data(), bytes.data(), DESCRIPTOR_BYTES);
         return descriptor;
     }
 

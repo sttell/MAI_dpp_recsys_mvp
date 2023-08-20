@@ -25,5 +25,7 @@ namespace exceptions {
 
     IMPLEMENT_DEFAULT_CONSTRUCTORS(BadURI, BadRequest)
 
+    IMPLEMENT_DEFAULT_CONSTRUCTORS(BadSettingValue, BadRequest)
+
 } // namespace exceptions
 } // namespace common

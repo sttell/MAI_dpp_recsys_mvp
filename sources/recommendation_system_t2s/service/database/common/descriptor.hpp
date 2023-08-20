@@ -51,7 +51,7 @@ namespace recsys_t2s::database {
 
     using Descriptor = std::array<DescriptorType, DescriptorField::_count_>;
 
-    std::string DescriptorToHexBlob(const Descriptor& descriptor);
+    std::string DescriptorToHexBlob(const Descriptor& descriptor, bool is_append_brackets=true);
     Descriptor HexBlobToDescriptor(const std::string& blob);
 
 } // namespace recsys_t2s::database

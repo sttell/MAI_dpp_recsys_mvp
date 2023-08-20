@@ -32,6 +32,8 @@ namespace exceptions {
 
     REGISTER_EXCEPTION_TYPE(BadURI, BadRequest);
 
+    REGISTER_EXCEPTION_TYPE(BadSettingValue, BadRequest);
+
 } // namespace exceptions
 } // namespace common
 

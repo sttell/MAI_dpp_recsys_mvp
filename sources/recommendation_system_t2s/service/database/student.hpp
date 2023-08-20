@@ -5,14 +5,16 @@
 #include <vector>
 #include <optional>
 
-#include "../common/id.hpp"
-#include "../common/institute_id.hpp"
-#include "../common/education_level.hpp"
-#include "../common/education_course.hpp"
+#include "common/id.hpp"
+#include "common/institute_id.hpp"
+#include "common/education_level.hpp"
+#include "common/education_course.hpp"
+#include "common/string_setting.hpp"
+#include "common/int_setting.hpp"
+#include "common/bool_setting.hpp"
 #include "common/object_constructor.hpp"
 #include "common/descriptor.hpp"
 
-#include "common/optional_with_status.hpp"
 
 namespace recsys_t2s::database {
 
@@ -26,10 +28,6 @@ namespace recsys_t2s::database {
         Student& operator=(Student&& user) = default;
         Student& operator=(const Student& user) = default;
 
-        static DatabaseStatus Init();
-        static optional_with_status<Student>     SearchByExternalID(const common::ID& external_id);
-        static optional_with_status<common::ID>  UpdateStudent(Student& updated);
-
         [[nodiscard]] std::pair<bool, std::optional<std::string>> UpdateDescriptor() const;
 
         ADD_FIELD(common::ID, ID, common::ID::None);
@@ -41,9 +39,9 @@ namespace recsys_t2s::database {
         ADD_FIELD(common::InstituteID, InstituteId, common::InstituteID::None);
         ADD_FIELD(common::EducationLevel, EducationLevel, common::EducationLevel::None);
         ADD_FIELD(common::EducationCourse, EducationCourse, common::EducationCourse::None);
-        ADD_FIELD(std::string, AcademicGroup, std::string{});
-        ADD_FIELD(int, Age, 0);
-        ADD_FIELD(bool, IsItStudent, false);
+        ADD_FIELD(common::StringSetting, AcademicGroup, common::StringSetting());
+        ADD_FIELD(common::IntSetting, Age, common::IntSetting());
+        ADD_FIELD(common::BoolSetting, IsItStudent, common::BoolSetting());
 
     };
 
