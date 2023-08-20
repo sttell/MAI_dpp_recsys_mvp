@@ -119,16 +119,56 @@ namespace recsys_t2s::handlers::impl {
         root->set("type", "/success");
         root->set("title", "OK");
         root->set("status", Poco::Net::HTTPResponse::HTTP_REASON_OK);
-        root->set("instance", "/user");
+        root->set("instance", "/team");
         std::ostream &ostr = t_response.send();
         Poco::JSON::Stringifier::stringify(root, ostr);
     }
 
     void TeamRequestHandler::HandleUpdateRequest(
-            recsys_t2s::handlers::IRequestHandler::HTTPServerRequestBase&,
+            recsys_t2s::handlers::IRequestHandler::HTTPServerRequestBase& t_request,
             recsys_t2s::handlers::IRequestHandler::HTTPServerResponseBase& t_response
     ) {
-        BaseRequestHandler::SetInternalErrorResponse(t_response, "PATCH Not implemented");
+        HTMLForm form(t_request);
+
+        /* Check if form has valid fields */
+        if( !ValidateRequestHasField(form, t_response, "team_id") ) return;
+
+        auto opt_team_id = form.getValue<unsigned int>("team_id");
+        auto opt_team_lead_id = form.getValue<unsigned int>("team_lead_id");
+
+        if ( !opt_team_id.has_value() )
+            HANDLER_RETURN_BAD_REQUEST(t_response, "Invalid data: unrecognized team ID data type.")
+
+        if ( form.has("team_id") && !opt_team_lead_id.has_value() )
+            HANDLER_RETURN_BAD_REQUEST(t_response, "Invalid data: unrecognized team lead ID data type.")
+
+        std::map<std::string, bool> fields_in_form;
+        fields_in_form["team_id"] = form.has("team_id");
+        fields_in_form["team_lead_id"] = form.has("team_lead_id");
+
+        database::Team team;
+        team.SetExternalID(opt_team_id.value());
+        if ( form.has("team_lead_id") )
+            team.SetTeamLeadID(opt_team_lead_id.value());
+
+        auto load_students_status = team.LoadStudents(true);
+        if ( load_students_status != database::DatabaseStatus::OK )
+            HANDLER_RETURN_BAD_REQUEST(t_response, load_students_status.GetMessage());
+
+        auto status = database::RecSysDatabase::UpdateTeam(team, fields_in_form);
+        if ( status != database::DatabaseStatus::OK && status != database::DatabaseStatus::NOTHING_TO_DO )
+            HANDLER_RETURN_BAD_REQUEST(t_response, status.GetMessage())
+
+        t_response.setStatus(Poco::Net::HTTPResponse::HTTPStatus::HTTP_OK);
+        t_response.setChunkedTransferEncoding(true);
+        t_response.setContentType("application/json");
+        Poco::JSON::Object::Ptr root = new Poco::JSON::Object();
+        root->set("type", "/success");
+        root->set("title", "OK");
+        root->set("status", Poco::Net::HTTPResponse::HTTP_REASON_OK);
+        root->set("instance", "/team");
+        std::ostream &ostr = t_response.send();
+        Poco::JSON::Stringifier::stringify(root, ostr);
     }
 
     void TeamRequestHandler::HandleDeleteRequest(
@@ -158,7 +198,7 @@ namespace recsys_t2s::handlers::impl {
         root->set("type", "/success");
         root->set("title", "OK");
         root->set("status", Poco::Net::HTTPResponse::HTTP_REASON_OK);
-        root->set("instance", "/user");
+        root->set("instance", "/team");
         std::ostream &ostr = t_response.send();
         Poco::JSON::Stringifier::stringify(root, ostr);
     }

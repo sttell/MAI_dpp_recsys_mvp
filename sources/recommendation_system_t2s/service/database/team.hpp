@@ -33,7 +33,7 @@ namespace recsys_t2s::database {
         void AppendExistsStudent(const common::ID& id, const Descriptor& student_desc);
         void RemoveExistsStudent(const common::ID& id, const Descriptor& student_desc);
 
-        DatabaseStatus LoadStudents() const;
+        DatabaseStatus LoadStudents(bool error_if_not_exists=false) const;
         std::pair<bool, std::optional<std::string>> UpdateDescriptor() const;
 
         ADD_FIELD(common::ID, ID, common::ID::None);

@@ -43,7 +43,7 @@ namespace recsys_t2s::database {
         static optional_with_status<Team> SearchTeamByExternalID(const common::ID& id);
 
         static DatabaseStatus UpdateStudent(Student new_student, const std::map<std::string, bool>& fields_in_form);
-        static DatabaseStatus UpdateTeam(Team new_team);
+        static DatabaseStatus UpdateTeam(const Team& new_team, const std::map<std::string, bool>& fields_in_form);
 
     };
 

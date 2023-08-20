@@ -17,15 +17,19 @@ namespace recsys_t2s::database {
         LoadStudents();
     }
 
-    DatabaseStatus Team::LoadStudents() const {
+    DatabaseStatus Team::LoadStudents(bool error_if_not_exists) const {
 
-        std::list<database::Student> new_students;
+        std::list<Student> new_students;
 
         // Load team lead
         {
-            auto [status, opt_student] = database::RecSysDatabase::SearchStudentByExternalID(m_TeamLeadID);
-            if (status != database::DatabaseStatus::OK && status != database::DatabaseStatus::ERROR_NOT_EXISTS)
-                return {status.GetCode(), "Error while search Team Lead: " + status.GetMessage()};
+            auto [status, opt_student] = RecSysDatabase::SearchStudentByExternalID(m_TeamLeadID);
+            if (status != DatabaseStatus::OK) {
+                if ( status != DatabaseStatus::ERROR_NOT_EXISTS || (error_if_not_exists && status == DatabaseStatus::ERROR_NOT_EXISTS) ) {
+                    return {status.GetCode(), "Error while search Team Lead: " + status.GetMessage()};
+                }
+            }
+
         }
 
         // Load employees
@@ -34,7 +38,10 @@ namespace recsys_t2s::database {
             auto [status, opt_student] = database::RecSysDatabase::SearchStudentByExternalID(student_id);
 
             if ( status == database::DatabaseStatus::ERROR_NOT_EXISTS ) {
-                to_erase_ids.push_back(student_id);
+                if ( error_if_not_exists )
+                    to_erase_ids.push_back(student_id);
+                else
+                    return status;
                 continue;
             }
 

@@ -1,7 +1,6 @@
 #include "recsys_database.hpp"
 
 #include <sstream>
-#include <iostream>
 
 #include "database.hpp"
 
@@ -475,16 +474,22 @@ namespace recsys_t2s::database {
         return DatabaseStatus::OK;
     }
 
-    DatabaseStatus RecSysDatabase::UpdateTeam(recsys_t2s::database::Team new_team) {
+    DatabaseStatus
+    RecSysDatabase::UpdateTeam(const Team& new_team, const std::map<std::string, bool>& fields_in_form) {
 
-        auto [ search_team_status, is_exists ] = CheckIfExistsTeamByExternalID(new_team.GetExternalID());
+        auto [ search_team_status, old_team_state ] = SearchTeamByExternalID(new_team.GetExternalID());
         if ( search_team_status != DatabaseStatus::OK ) {
             return search_team_status;
         }
-        if ( !is_exists.value() ) {
-            return {
-                DatabaseStatus::ERROR_NOT_EXISTS,
-                "Team with ID " + new_team.GetExternalID().AsString() + " not exists.",
+
+        if ( !fields_in_form.count("team_lead_id") || old_team_state->GetTeamLeadID() == new_team.GetTeamLeadID() ) {
+            return DatabaseStatus::NOTHING_TO_DO;
+        }
+
+        if ( !old_team_state->GetStudentExternalIndices().count(new_team.GetTeamLeadID()) ) {
+            return { DatabaseStatus::ERROR_BAD_REQUEST,
+                     "A student with ID " + new_team.GetTeamLeadID().AsString() +
+                     " is not a member of Team " + new_team.GetExternalID().AsString() + "."
             };
         }
 
