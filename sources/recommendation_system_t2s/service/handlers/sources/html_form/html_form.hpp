@@ -65,7 +65,7 @@ namespace recsys_t2s::handlers::impl {
     std::optional<T> HTMLForm::getValue( const std::string& field_key ) const {
 
         if ( !this->has(field_key) ) {
-            return std::make_optional<T>();
+            return std::nullopt;
         }
 
         if constexpr ( std::is_convertible_v<T, std::string> ) {
@@ -76,21 +76,14 @@ namespace recsys_t2s::handlers::impl {
 
         if constexpr ( std::is_same_v<T, bool> ) {
 
-            std::string lower_string;
-            std::transform(string_value.begin(), string_value.end(), lower_string.begin(),
-                [](char sym) -> char {
-                    return static_cast<char>(std::tolower(sym));
-                }
-            );
-
-            if ( lower_string == "true" || lower_string == "1" ) {
+            if ( string_value == "true" || string_value == "1" ) {
                 return std::make_optional(true);
             }
-            if ( lower_string == "false" || lower_string == "0" ) {
+            if ( string_value == "false" || string_value == "0" ) {
                 return std::make_optional(false);
             }
 
-            return std::make_optional<bool>();
+            return std::nullopt;
         }
 
         // For integer types
@@ -99,13 +92,13 @@ namespace recsys_t2s::handlers::impl {
             if constexpr( std::is_unsigned_v<T> ) {
 
                 if ( !utils::IsValidInteger(string_value, true) )
-                    return std::make_optional<T>();
+                    return std::nullopt;
                 return std::make_optional(static_cast<T>(utils::StringToUnsignedLongLong(string_value)));
 
             } else {
 
                 if ( !utils::IsValidInteger(string_value, false) )
-                    return std::make_optional<T>();
+                    return std::nullopt;
                 return std::make_optional(static_cast<T>(utils::StringToSignedLongLong(string_value)));
 
             }

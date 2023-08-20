@@ -9,8 +9,8 @@
 #include "../common/institute_id.hpp"
 #include "../common/education_level.hpp"
 #include "../common/education_course.hpp"
-
-#include "student_indexer.hpp"
+#include "common/object_constructor.hpp"
+#include "common/descriptor.hpp"
 
 #include "common/optional_with_status.hpp"
 
@@ -27,21 +27,23 @@ namespace recsys_t2s::database {
         Student& operator=(const Student& user) = default;
 
         static DatabaseStatus Init();
-
-        static optional_with_status<bool>        CheckIfExistsByExternalID(const common::ID& external_id);
-        static optional_with_status<Student>     SearchByID(const common::ID& id);
         static optional_with_status<Student>     SearchByExternalID(const common::ID& external_id);
-        static optional_with_status<common::ID>  DeleteByExternalID(const common::ID& external_id);
-        static optional_with_status<common::ID>  UpdateStudent(const Student& updated, const StudentIndex& index);
+        static optional_with_status<common::ID>  UpdateStudent(Student& updated);
 
-        DatabaseStatus InsertToDatabase(const StudentIndex& index);
+        [[nodiscard]] std::pair<bool, std::optional<std::string>> UpdateDescriptor() const;
 
         ADD_FIELD(common::ID, ID, common::ID::None);
         ADD_FIELD(common::ID, ExternalID, common::ID::None);
         ADD_FIELD(common::ID, ProgramID, common::ID::None);
         ADD_FIELD(common::ID, TeamID, common::ID::None);
-        ADD_FIELD(StudentDescriptor, Descriptor, {});
-        ADD_FIELD(bool, IsHaveTeam, false);
+        ADD_FIELD(common::ID, IndexInfoID, common::ID::None);
+        ADD_MUTABLE_FIELD(Descriptor, Descriptor, {});
+        ADD_FIELD(common::InstituteID, InstituteId, common::InstituteID::None);
+        ADD_FIELD(common::EducationLevel, EducationLevel, common::EducationLevel::None);
+        ADD_FIELD(common::EducationCourse, EducationCourse, common::EducationCourse::None);
+        ADD_FIELD(std::string, AcademicGroup, std::string{});
+        ADD_FIELD(int, Age, 0);
+        ADD_FIELD(bool, IsItStudent, false);
 
     };
 

@@ -5,8 +5,7 @@
 #include "Poco/DateTimeFormat.h"
 
 #include "../database/database.hpp"
-#include "../database/student.hpp"
-#include "../database/student_indexer.hpp"
+#include "../database/recsys_database.hpp"
 
 #include "handlers/include/handlers/request_handler_factory.hpp"
 
@@ -48,7 +47,7 @@ namespace recsys_t2s {
             }
         }
 
-        database::Student::Init();
+        database::RecSysDatabase::Init();
 
         std::cout << "Connected." << std::endl;
 

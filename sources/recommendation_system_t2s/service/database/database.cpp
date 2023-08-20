@@ -12,7 +12,6 @@ using Poco::Data::Keywords::use;
 using Poco::Data::Keywords::into;
 using Poco::Data::Keywords::range;
 
-
 namespace recsys_t2s::database {
 
     Database* Database::Instance(){

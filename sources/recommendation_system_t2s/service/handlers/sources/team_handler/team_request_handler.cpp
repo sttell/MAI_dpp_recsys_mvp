@@ -2,6 +2,8 @@
 
 #include "Poco/JSON/Array.h"
 
+#include "database/recsys_database.hpp"
+
 #include <map>
 #include <iostream>
 
@@ -64,59 +66,64 @@ namespace recsys_t2s::handlers::impl {
 
         /* Check if form has valid fields */
         if( !ValidateRequestHasField(form, t_response, "team_id") ) return;
+        if( !ValidateRequestHasField(form, t_response, "team_lead_id") ) return;
         if( !ValidateRequestHasField(form, t_response, "students") ) return;
 
         auto opt_team_id = form.getValue<unsigned int>("team_id");
+        auto opt_team_lead_id = form.getValue<unsigned int>("team_lead_id");
         auto opt_students = form.getValue<Poco::JSON::Array>("students");
 
-        if ( !opt_team_id.has_value() ) {
-            BaseRequestHandler::SetBadRequestResponse(t_response, "Invalid data: unrecognized team ID data type.");
-            return;
-        }
-        if ( !opt_students.has_value() ) {
-            BaseRequestHandler::SetBadRequestResponse(t_response, "Invalid data: students field must be json array with unsigned integer identifiers.");
-            return;
-        }
+        if ( !opt_team_id.has_value() )
+            HANDLER_RETURN_BAD_REQUEST(t_response, "Invalid data: unrecognized team ID data type.")
 
-        std::vector<unsigned long> students_id{};
-        std::size_t students_count = opt_students.value().size();
-        students_id.reserve(students_count);
+        if ( !opt_team_lead_id.has_value() )
+            HANDLER_RETURN_BAD_REQUEST(t_response, "Invalid data: unrecognized team lead ID data type.")
 
-        for ( std::size_t i = 0; i < students_count; ++i ) {
+        if ( !opt_students.has_value() )
+            HANDLER_RETURN_BAD_REQUEST(t_response, "Invalid data: students field must be json array with unsigned integer identifiers.")
+
+        /* Convert JSON Array student IDs to vector of common::ID */
+        std::set<common::ID> students_id{};
+
+        for ( std::size_t i = 0; i < opt_students.value().size(); ++i ) {
             auto student_id = opt_students.value().get(i);
             const std::string& str_value = student_id.toString();
 
             const bool is_integer = student_id.isInteger();
-            if ( !is_integer ) {
-                SetBadRequestResponse(
-                        t_response,
-                        "Invalid data: unrecognized student ID data type in students array."
-                );
-                return;
-            }
 
-            students_id.push_back(static_cast<unsigned long>(utils::StringToUnsignedLongLong(str_value)));
+            if ( !is_integer )
+                HANDLER_RETURN_BAD_REQUEST(t_response, "Invalid data: unrecognized student ID data type in students array.")
+
+            students_id.insert(utils::StringToUnsignedLongLong(str_value));
 
         }
 
         unsigned int team_id = opt_team_id.value();
+        unsigned int team_lead_id = opt_team_lead_id.value();
 
-        for ( [[maybe_unused]] const auto& student_id : students_id ) {
-            // Check if student registred in system
-        }
-        // TODO: Implement
-        // Is team id registred in system? If yes, then you can set 406 error.
+        students_id.insert(team_lead_id);
 
+        database::Team team;
+        team.SetExternalID(team_id);
+        team.SetTeamLeadID(team_lead_id);
+        team.SetStudentExternalIndices(students_id);
 
-        std::cout << "Add request: " << std::endl;
-        std::cout << "\tTeam ID : " << team_id << std::endl;
-        std::cout << "\tStudents: ";
-        for ( auto& item : students_id ) {
-            std::cout << item << ", ";
-        }
-        std::cout << std::endl;
+        auto [status, inserted_id] = database::RecSysDatabase::InsertTeam(team);
 
-        BaseRequestHandler::SetInternalErrorResponse(t_response, "POST Not implemented");
+        if ( status != database::DatabaseStatus::OK )
+            HANDLER_RETURN_BAD_REQUEST(t_response, status.GetMessage())
+
+        t_response.setStatus(Poco::Net::HTTPResponse::HTTPStatus::HTTP_OK);
+        t_response.setChunkedTransferEncoding(true);
+        t_response.setContentType("application/json");
+        Poco::JSON::Object::Ptr root = new Poco::JSON::Object();
+        root->set("type", "/success");
+        root->set("title", "OK");
+        root->set("status", Poco::Net::HTTPResponse::HTTP_REASON_OK);
+        root->set("instance", "/user");
+        root->set("id", inserted_id->AsString());
+        std::ostream &ostr = t_response.send();
+        Poco::JSON::Stringifier::stringify(root, ostr);
     }
 
     void TeamRequestHandler::HandleUpdateRequest(
@@ -127,10 +134,35 @@ namespace recsys_t2s::handlers::impl {
     }
 
     void TeamRequestHandler::HandleDeleteRequest(
-            recsys_t2s::handlers::IRequestHandler::HTTPServerRequestBase&,
+            recsys_t2s::handlers::IRequestHandler::HTTPServerRequestBase& t_request,
             recsys_t2s::handlers::IRequestHandler::HTTPServerResponseBase& t_response
     ) {
-        BaseRequestHandler::SetInternalErrorResponse(t_response, "DELETE Not implemented");
+        HTMLForm form(t_request);
+
+        /* Check if form has valid fields */
+        if( !ValidateRequestHasField(form, t_response, "team_id") ) return;
+
+        auto opt_team_id = form.getValue<unsigned int>("team_id");
+
+        if ( !opt_team_id.has_value() )
+            HANDLER_RETURN_BAD_REQUEST(t_response, "Invalid data: unrecognized team ID data type.")
+
+        unsigned int team_id = opt_team_id.value();
+
+        auto status = database::RecSysDatabase::DeleteTeamByExternalID(team_id);
+        if ( status != database::DatabaseStatus::OK )
+            HANDLER_RETURN_BAD_REQUEST(t_response, status.GetMessage())
+
+        t_response.setStatus(Poco::Net::HTTPResponse::HTTPStatus::HTTP_OK);
+        t_response.setChunkedTransferEncoding(true);
+        t_response.setContentType("application/json");
+        Poco::JSON::Object::Ptr root = new Poco::JSON::Object();
+        root->set("type", "/success");
+        root->set("title", "OK");
+        root->set("status", Poco::Net::HTTPResponse::HTTP_REASON_OK);
+        root->set("instance", "/user");
+        std::ostream &ostr = t_response.send();
+        Poco::JSON::Stringifier::stringify(root, ostr);
     }
 
 } // namespace recsys_t2s::handlers::impl

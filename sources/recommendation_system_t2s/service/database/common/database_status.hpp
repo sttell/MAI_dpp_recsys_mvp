@@ -11,11 +11,12 @@ namespace recsys_t2s::database {
         enum Type : uint8_t {
             None = 0,
             OK,
+            TRANSACTION_WAIT,
             ERROR_OBJECT_EXISTS,
             ERROR_STATEMENT,
             ERROR_CONNECTION,
             ERROR_NOT_EXISTS,
-            ERROR_CREATE_INDEX,
+            ERROR_CREATE_DESCRIPTOR,
             ERROR_NOT_IMPLEMENTED,
             _count_,
         };
@@ -41,6 +42,7 @@ namespace recsys_t2s::database {
         constexpr bool operator<( const DatabaseStatus& rhs ) { return m_Type < rhs.m_Type; }
 
         std::string GetMessage() const noexcept { return m_Message; }
+        Type GetCode() const noexcept { return m_Type; }
 
     private:
         Type m_Type;

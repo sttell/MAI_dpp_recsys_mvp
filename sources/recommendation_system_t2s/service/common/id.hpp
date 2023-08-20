@@ -23,7 +23,7 @@ namespace recsys_t2s::common {
         constexpr bool operator==( const ID& rhs ) { return (m_IsNone) ? false : (m_ID == rhs); }
 
         constexpr bool operator!=( const ID& rhs ) { return (m_IsNone) ? false : (m_ID != rhs); }
-
+        constexpr bool operator!=( const id_type& rhs ) { return (m_IsNone) ? false : (m_ID != rhs); }
         constexpr bool operator<( const ID& rhs ) { return (m_IsNone) ? false : (m_ID < rhs); }
 
         [[nodiscard]] std::string AsString() const {

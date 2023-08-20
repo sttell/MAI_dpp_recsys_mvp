@@ -25,6 +25,8 @@ include_directories("/usr/local/include/mysql")
 include_directories(service)
 include_directories(service/handlers/include)
 
+add_subdirectory(tests)
+
 link_directories("/usr/local/lib")
 
 add_executable(${EXECUTABLE_NAME}
@@ -39,10 +41,10 @@ add_executable(${EXECUTABLE_NAME}
         service/handlers/sources/student_handler/student_request_handler.cpp
 
         service/database/database.cpp
+        service/database/recsys_database.cpp
         service/database/student.cpp
-        service/database/student_indexer.cpp
-        service/database/student_indexer.hpp
-
+        service/database/common/descriptor.cpp
+        service/database/team.cpp
         service/config/server_config.cpp
         service/config/path_validate.cpp
 

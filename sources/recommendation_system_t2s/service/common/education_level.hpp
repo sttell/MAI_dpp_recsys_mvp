@@ -25,6 +25,8 @@ namespace recsys_t2s::common {
 
         constexpr EducationLevel( Type type ) : m_Type(type) { /* Empty */ };
 
+        constexpr EducationLevel( uint8_t type ) : m_Type(static_cast<Type>(type)) { /* Empty */ }
+
         EducationLevel(const std::string& string_name) : m_Type(Type::None) {
 
             static const std::map<std::string, Type> string_to_type{

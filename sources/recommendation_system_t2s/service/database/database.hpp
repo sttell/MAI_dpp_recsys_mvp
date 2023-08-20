@@ -8,9 +8,12 @@
 
 #include "Poco/Data/Session.h"
 #include "Poco/Data/SessionPool.h"
+#include "Poco/Data/MySQL/MySQLException.h"
 
 using Session = Poco::Data::Session;
 using SessionPool = Poco::Data::SessionPool;
+using Poco::Data::Session;
+using Poco::Data::Statement;
 
 #define START_STATEMENT_SECTION try {
 
@@ -39,6 +42,17 @@ using SessionPool = Poco::Data::SessionPool;
 } catch ( Poco::Data::MySQL::StatementException& e ) {                                                          \
     std::cerr << "Statement exception while init to database: " << e.displayText() << std::endl;                \
     return OPT_WITH_STATUS_ERR(ERROR_STATEMENT, e.displayText(), return_type);                                  \
+}
+
+#define END_STATEMENT_SECTION_WITH_OPTIONAL_OBJECT(optional_object) \
+} catch ( Poco::Data::MySQL::ConnectionException& e ) {                                                         \
+    std::cerr << "Connection to database error: " << e.displayText() << std::endl;                              \
+    auto status = DatabaseStatus{DatabaseStatus::ERROR_CONNECTION, e.displayText()};                            \
+    return OPT_WITH_STATUS(status, optional_object);                                                            \
+} catch ( Poco::Data::MySQL::StatementException& e ) {                                                          \
+    std::cerr << "Statement exception while init to database: " << e.displayText() << std::endl;                \
+    auto status = DatabaseStatus{DatabaseStatus::ERROR_STATEMENT, e.displayText()};                             \
+    return OPT_WITH_STATUS(status, optional_object);                                                            \
 }
 
 namespace recsys_t2s::config { class DatabaseConfig; }
