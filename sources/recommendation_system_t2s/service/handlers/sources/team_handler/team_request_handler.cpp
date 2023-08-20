@@ -51,10 +51,39 @@ namespace recsys_t2s::handlers::impl {
     }
 
     void TeamRequestHandler::HandleGetRequest(
-            recsys_t2s::handlers::IRequestHandler::HTTPServerRequestBase&,
+            recsys_t2s::handlers::IRequestHandler::HTTPServerRequestBase& t_request,
             recsys_t2s::handlers::IRequestHandler::HTTPServerResponseBase& t_response
     ) {
-        BaseRequestHandler::SetInternalErrorResponse(t_response, "GET Not implemented");
+        HTMLForm form(t_request);
+
+        if (!ValidateRequestHasField(form, t_response, "team_id")) return;
+
+        auto opt_team_id = form.getValue<unsigned int>("team_id");
+
+        if ( !opt_team_id.has_value() )
+            HANDLER_RETURN_BAD_REQUEST(t_response, "Invalid data: unrecognized team id data type.");
+
+
+        auto [recommendation_status, ranged_ids] = database::RecSysDatabase::GetRecommendationListForTeam(opt_team_id.value());
+        if ( recommendation_status != database::DatabaseStatus::OK )
+            HANDLER_RETURN_BAD_REQUEST(t_response, recommendation_status.GetMessage());
+
+        t_response.setStatus(Poco::Net::HTTPResponse::HTTPStatus::HTTP_OK);
+        t_response.setChunkedTransferEncoding(true);
+        t_response.setContentType("application/json");
+
+        Poco::JSON::Array array_of_ids;
+        for( const auto& id : ranged_ids.value() )
+            array_of_ids.add(static_cast<int>(id));
+
+        Poco::JSON::Object::Ptr root = new Poco::JSON::Object();
+        root->set("type", "/success");
+        root->set("title", "OK");
+        root->set("status", Poco::Net::HTTPResponse::HTTP_REASON_OK);
+        root->set("instance", "/user");
+        root->set("teams", array_of_ids);
+        std::ostream &ostr = t_response.send();
+        Poco::JSON::Stringifier::stringify(root, ostr);
     }
 
     void TeamRequestHandler::HandlePostRequest(

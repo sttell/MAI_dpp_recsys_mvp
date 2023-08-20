@@ -69,7 +69,6 @@ namespace recsys_t2s::handlers::impl {
         t_response.setChunkedTransferEncoding(true);
         t_response.setContentType("application/json");
 
-
         Poco::JSON::Array array_of_ids;
         for( const auto& id : ranged_ids.value() )
             array_of_ids.add(static_cast<int>(id));

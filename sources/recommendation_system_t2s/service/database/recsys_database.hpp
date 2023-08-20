@@ -46,9 +46,10 @@ namespace recsys_t2s::database {
         static DatabaseStatus UpdateTeam(const Team& new_team, const std::map<std::string, bool>& fields_in_form);
 
         static optional_with_status<std::vector<common::ID>> GetRecommendationListForStudent(const common::ID& student_id);
+        static optional_with_status<std::vector<common::ID>> GetRecommendationListForTeam(const common::ID& team_id);
 
     private:
-        static optional_with_status<std::vector<Student>> GetAllStudentsMatchInfo(const Team& match_subject);
+        static optional_with_status<std::vector<Student>> GetAllStudentsMatchInfo(const Team& team);
         static optional_with_status<std::vector<Team>> GetAllTeamsMatchInfo(const common::ID& student_id);
 
 

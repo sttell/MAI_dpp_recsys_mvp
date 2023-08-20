@@ -650,13 +650,13 @@ namespace recsys_t2s::database {
         return DatabaseStatus::OK;
     }
 
-    optional_with_status<std::vector<Student>> RecSysDatabase::GetAllStudentsMatchInfo(const Team& match_subject) {
+    optional_with_status<std::vector<Student>> RecSysDatabase::GetAllStudentsMatchInfo(const Team& team) {
 
-        if ( match_subject.GetTeamLeadID() == common::ID::None ) {
+        if ( team.GetTeamLeadID() == common::ID::None ) {
             return OPT_WITH_STATUS_ERR(ERROR_BAD_REQUEST, "None team lead ID.");
         }
 
-        auto [ lead_search_status, team_lead ] = RecSysDatabase::SearchStudentByExternalID(match_subject.GetTeamLeadID());
+        auto [ lead_search_status, team_lead ] = RecSysDatabase::SearchStudentByExternalID(team.GetTeamLeadID());
         if ( lead_search_status != DatabaseStatus::OK ) {
             return OPT_WITH_STATUS_ERR(ERROR_BAD_REQUEST, "Team Lead not exists.");
         }
@@ -763,6 +763,43 @@ namespace recsys_t2s::database {
             [](const std::pair<common::ID, float>& left, const std::pair<common::ID, float>& right){
                 return right > left;
             }
+        );
+
+        std::vector<common::ID> return_ids;
+        return_ids.reserve(id_to_distance_kv.size());
+
+        for ( const auto& kv : id_to_distance_kv ) {
+            return_ids.emplace_back(kv.first);
+        }
+
+        return OPT_WITH_STATUS_OK(return_ids);
+    }
+
+    optional_with_status<std::vector<common::ID>>
+    RecSysDatabase::GetRecommendationListForTeam(const common::ID &team_id) {
+        auto [ search_team_status, match_subject ] = SearchTeamByExternalID(team_id);
+        if ( search_team_status != DatabaseStatus::OK )
+            return OPT_WITH_STATUS(search_team_status, std::nullopt);
+
+        auto [ status, students ] = GetAllStudentsMatchInfo(match_subject.value());
+        if ( status != DatabaseStatus::OK )
+            return OPT_WITH_STATUS(status, std::nullopt);
+
+        std::vector<std::pair<common::ID, float>> id_to_distance_kv;
+        id_to_distance_kv.reserve(students->size());
+        Descriptor corner_descriptor = match_subject->GetDescriptor();
+        for ( const auto& student : students.value()) {
+            id_to_distance_kv.emplace_back(
+                    student.GetExternalID(),
+                    DistanceBetweenDescriptors(corner_descriptor, student.GetDescriptor())
+            );
+        }
+
+        std::sort(
+                id_to_distance_kv.begin(), id_to_distance_kv.end(),
+                [](const std::pair<common::ID, float>& left, const std::pair<common::ID, float>& right){
+                    return right > left;
+                }
         );
 
         std::vector<common::ID> return_ids;
