@@ -54,6 +54,8 @@ namespace recsys_t2s::database {
     std::string DescriptorToHexBlob(const Descriptor& descriptor, bool is_append_brackets=true);
     Descriptor HexBlobToDescriptor(const std::string& blob);
 
+    float DistanceBetweenDescriptors(const Descriptor& left, const Descriptor& right);
+
 } // namespace recsys_t2s::database
 
 #endif //RECOMMENDATION_SYSTEM_DESCRIPTOR_HPP

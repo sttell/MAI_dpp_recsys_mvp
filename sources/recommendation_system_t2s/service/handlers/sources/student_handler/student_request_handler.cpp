@@ -48,10 +48,40 @@ namespace recsys_t2s::handlers::impl {
     }
 
     void StudentRequestHandler::HandleGetRequest(
-            recsys_t2s::handlers::IRequestHandler::HTTPServerRequestBase&,
+            recsys_t2s::handlers::IRequestHandler::HTTPServerRequestBase& t_request,
             recsys_t2s::handlers::IRequestHandler::HTTPServerResponseBase& t_response
     ) {
-        BaseRequestHandler::SetInternalErrorResponse(t_response, "GET Not implemented");
+        HTMLForm form(t_request);
+
+        if (!ValidateRequestHasField(form, t_response, "student_id")) return;
+
+        auto opt_student_id = form.getValue<unsigned int>("student_id");
+
+        if ( !opt_student_id.has_value() )
+            HANDLER_RETURN_BAD_REQUEST(t_response, "Invalid data: unrecognized student id data type.");
+
+
+        auto [search_student_status, ranged_ids] = database::RecSysDatabase::GetRecommendationListForStudent(opt_student_id.value());
+        if ( search_student_status != database::DatabaseStatus::OK )
+            HANDLER_RETURN_BAD_REQUEST(t_response, search_student_status.GetMessage());
+
+        t_response.setStatus(Poco::Net::HTTPResponse::HTTPStatus::HTTP_OK);
+        t_response.setChunkedTransferEncoding(true);
+        t_response.setContentType("application/json");
+
+
+        Poco::JSON::Array array_of_ids;
+        for( const auto& id : ranged_ids.value() )
+            array_of_ids.add(static_cast<int>(id));
+
+        Poco::JSON::Object::Ptr root = new Poco::JSON::Object();
+        root->set("type", "/success");
+        root->set("title", "OK");
+        root->set("status", Poco::Net::HTTPResponse::HTTP_REASON_OK);
+        root->set("instance", "/user");
+        root->set("teams", array_of_ids);
+        std::ostream &ostr = t_response.send();
+        Poco::JSON::Stringifier::stringify(root, ostr);
     }
 
     void StudentRequestHandler::HandlePostRequest(recsys_t2s::handlers::IRequestHandler::HTTPServerRequestBase& t_request,

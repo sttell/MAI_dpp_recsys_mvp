@@ -6,7 +6,7 @@
 
 #define OPT_WITH_STATUS(status, value) std::make_pair(status, value)
 #define OPT_WITH_STATUS_OK(value_to_make_opt) std::make_pair(DatabaseStatus{DatabaseStatus::OK, "OK"}, std::make_optional<decltype(value_to_make_opt)>(value_to_make_opt))
-#define OPT_WITH_STATUS_ERR(err_type, message, return_type) std::make_pair(DatabaseStatus{DatabaseStatus::err_type, message}, std::make_optional<return_type>())
+#define OPT_WITH_STATUS_ERR(err_type, message) std::make_pair(DatabaseStatus{DatabaseStatus::err_type, message}, std::nullopt)
 
 namespace recsys_t2s::database {
 

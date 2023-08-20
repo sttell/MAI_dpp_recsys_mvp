@@ -35,13 +35,13 @@ using Poco::Data::Statement;
     return DatabaseStatus{DatabaseStatus::ERROR_STATEMENT, e.displayText()};                                  \
 }
 
-#define END_STATEMENT_SECTION_WITH_OPT(return_type)                                                                      \
+#define END_STATEMENT_SECTION_WITH_OPT                                                                      \
 } catch ( Poco::Data::MySQL::ConnectionException& e ) {                                                         \
     std::cerr << "Connection to database error: " << e.displayText() << std::endl;                              \
-    return OPT_WITH_STATUS_ERR(ERROR_CONNECTION, e.displayText(), return_type);                                 \
+    return OPT_WITH_STATUS_ERR(ERROR_CONNECTION, e.displayText());                                 \
 } catch ( Poco::Data::MySQL::StatementException& e ) {                                                          \
     std::cerr << "Statement exception while init to database: " << e.displayText() << std::endl;                \
-    return OPT_WITH_STATUS_ERR(ERROR_STATEMENT, e.displayText(), return_type);                                  \
+    return OPT_WITH_STATUS_ERR(ERROR_STATEMENT, e.displayText());                                  \
 }
 
 #define END_STATEMENT_SECTION_WITH_OPTIONAL_OBJECT(optional_object) \

@@ -116,7 +116,7 @@ namespace recsys_t2s::database {
             if ( selected_count == 0 )
                 return OPT_WITH_STATUS_OK(false);
 
-        END_STATEMENT_SECTION_WITH_OPT(bool);
+        END_STATEMENT_SECTION_WITH_OPT
 
         return OPT_WITH_STATUS_OK(true);
 
@@ -144,15 +144,16 @@ namespace recsys_t2s::database {
 
             size_t selected_count = select_statement.execute();
             if ( selected_count == 0 )
-                return OPT_WITH_STATUS_ERR(ERROR_NOT_EXISTS, "Team with ID " + in_external_id + " not exists.", Team);
+                return OPT_WITH_STATUS_ERR(ERROR_NOT_EXISTS, "Team with ID " + in_external_id + " not exists.");
 
             team.SetID(out_inner_id);
             team.SetExternalID(id);
             team.SetTeamLeadID(out_team_lead_id);
             team.SetDescriptor(HexBlobToDescriptor(out_descriptor_blob));
 
-        END_STATEMENT_SECTION_WITH_OPT(Team)
+        END_STATEMENT_SECTION_WITH_OPT
 
+        START_STATEMENT_SECTION
             Session session = database::Database::Instance()->CreateSession();
             Statement select_statement(session);
 
@@ -180,11 +181,9 @@ namespace recsys_t2s::database {
 
             auto [is_updated, reason] = team.UpdateDescriptor();
             if ( !is_updated )
-                return OPT_WITH_STATUS_ERR(ERROR_CREATE_DESCRIPTOR, reason.value(), Team);
+                return OPT_WITH_STATUS_ERR(ERROR_CREATE_DESCRIPTOR, reason.value());
 
-        START_STATEMENT_SECTION
-
-        END_STATEMENT_SECTION_WITH_OPT(Team)
+        END_STATEMENT_SECTION_WITH_OPT
 
         return OPT_WITH_STATUS_OK(team);
     }
@@ -289,7 +288,7 @@ namespace recsys_t2s::database {
             if ( selected_count == 0 )
                 return OPT_WITH_STATUS_OK(false);
 
-        END_STATEMENT_SECTION_WITH_OPT(bool);
+        END_STATEMENT_SECTION_WITH_OPT
 
         return OPT_WITH_STATUS_OK(true);
     }
@@ -384,8 +383,7 @@ namespace recsys_t2s::database {
             if ( selected_cnt == 0 ) {
                 return OPT_WITH_STATUS_ERR(
                         ERROR_NOT_EXISTS,
-                        "Student with ID " + id.AsString() + " not exists.",
-                        Student
+                        "Student with ID " + id.AsString() + " not exists."
                 );
             }
 
@@ -401,7 +399,7 @@ namespace recsys_t2s::database {
             student.SetAge(out_age);
             student.SetIsItStudent(out_is_it_student);
 
-        END_STATEMENT_SECTION_WITH_OPT(Student)
+        END_STATEMENT_SECTION_WITH_OPT
 
         return OPT_WITH_STATUS_OK(student);
     }
@@ -550,7 +548,7 @@ namespace recsys_t2s::database {
         bool is_old_has_team = opt_student->GetTeamID() != recsys_t2s::common::ID::None;
         bool is_new_has_team = new_student.GetTeamID() != recsys_t2s::common::ID::None;
 
-        if ( is_old_has_team && is_update_team_id ) {
+        if ( is_old_has_team ) {
 
             auto [ status, opt_team ] = SearchTeamByExternalID(opt_student->GetTeamID());
             if ( status != DatabaseStatus::OK )
@@ -558,7 +556,7 @@ namespace recsys_t2s::database {
             old_team = opt_team;
 
         }
-        if ( is_new_has_team && is_update_team_id ) {
+        if ( is_new_has_team ) {
 
             auto [ status, opt_team ] = SearchTeamByExternalID(new_student.GetTeamID());
             if ( status != DatabaseStatus::OK )
@@ -567,7 +565,7 @@ namespace recsys_t2s::database {
 
         }
 
-        if ( is_old_has_team && old_team->GetStudents().size() == 1 ) {
+        if ( is_old_has_team && old_team->GetStudents().size() == 1 && is_update_team_id ) {
             return {
                 DatabaseStatus::ERROR_BAD_REQUEST,
                 "Command " +
@@ -650,6 +648,131 @@ namespace recsys_t2s::database {
         END_STATEMENT_SECTION_WITH_STATUS
 
         return DatabaseStatus::OK;
+    }
+
+    optional_with_status<std::vector<Student>> RecSysDatabase::GetAllStudentsMatchInfo(const Team& match_subject) {
+
+        if ( match_subject.GetTeamLeadID() == common::ID::None ) {
+            return OPT_WITH_STATUS_ERR(ERROR_BAD_REQUEST, "None team lead ID.");
+        }
+
+        auto [ lead_search_status, team_lead ] = RecSysDatabase::SearchStudentByExternalID(match_subject.GetTeamLeadID());
+        if ( lead_search_status != DatabaseStatus::OK ) {
+            return OPT_WITH_STATUS_ERR(ERROR_BAD_REQUEST, "Team Lead not exists.");
+        }
+
+        std::vector<Student> students;
+        START_STATEMENT_SECTION
+
+        Session session = Database::Instance()->CreateSession();
+        Statement statement(session);
+
+        std::string in_program_id = team_lead->GetProgramID().AsString();
+        std::string in_team_id = std::to_string(common::ID::None);
+
+        common::ID::id_type out_external_id;
+        std::string out_descriptor;
+
+        statement << "SELECT external_id, descriptor FROM " STUDENTS_TABLE_NAME " WHERE program_id=? AND team_id=?",
+                     into(out_external_id), into(out_descriptor),
+                     use(in_program_id), use(in_team_id), range(0, 1);
+
+        while (!statement.done()) {
+            if ( statement.execute() ) {
+                Student new_student;
+                new_student.SetExternalID(out_external_id);
+                new_student.SetDescriptor(HexBlobToDescriptor(out_descriptor));
+                students.push_back(new_student);
+            }
+        }
+
+        END_STATEMENT_SECTION_WITH_OPT
+
+        return OPT_WITH_STATUS_OK(students);
+    }
+
+    optional_with_status<std::vector<Team>>
+    RecSysDatabase::GetAllTeamsMatchInfo(const common::ID& student_id) {
+
+        auto [subject_search_status, subject_info] = SearchStudentByExternalID(student_id);
+        if ( subject_search_status != DatabaseStatus::OK ) {
+            return OPT_WITH_STATUS(subject_search_status, std::nullopt);
+        }
+
+        std::vector<Team> teams;
+
+        START_STATEMENT_SECTION
+
+            Session session = Database::Instance()->CreateSession();
+            Statement statement(session);
+
+            std::string in_program_id = subject_info->GetProgramID().AsString();
+            std::string in_null_team_id = std::to_string(common::ID::None);
+
+            common::ID::id_type out_external_id;
+            std::string out_descriptor;
+
+            statement << "SELECT temp.external_id, temp.descriptor "
+                      << "FROM (SELECT external_id, team_lead_id, descriptor FROM " TEAMS_TABLE_NAME " WHERE NOT team_lead_id=?) AS temp "
+                      << "LEFT JOIN " STUDENTS_TABLE_NAME " ON temp.team_lead_id = " STUDENTS_TABLE_NAME ".external_id "
+                      << "WHERE (NOT temp.team_lead_id=?) AND " STUDENTS_TABLE_NAME ".program_id=?",
+                      into(out_external_id),
+                      into(out_descriptor),
+                      use(in_null_team_id),
+                      use(in_null_team_id),
+                      use(in_program_id),
+                      range(0, 1);
+
+            while (!statement.done()) {
+                if ( statement.execute() ) {
+                    Team new_team;
+                    new_team.SetExternalID(out_external_id);
+                    new_team.SetDescriptor(HexBlobToDescriptor(out_descriptor));
+                    teams.push_back(new_team);
+                }
+            }
+
+        END_STATEMENT_SECTION_WITH_OPT
+
+        return OPT_WITH_STATUS_OK(teams);
+    }
+
+    optional_with_status<std::vector<common::ID>>
+    RecSysDatabase::GetRecommendationListForStudent(const common::ID& student_id) {
+
+        auto [ search_student_status, match_subject ] = SearchStudentByExternalID(student_id);
+        if ( search_student_status != DatabaseStatus::OK )
+            return OPT_WITH_STATUS(search_student_status, std::nullopt);
+
+        auto [ status, teams ] = GetAllTeamsMatchInfo(student_id);
+        if ( status != DatabaseStatus::OK )
+            return OPT_WITH_STATUS(status, std::nullopt);
+
+        std::vector<std::pair<common::ID, float>> id_to_distance_kv;
+        id_to_distance_kv.reserve(teams->size());
+        Descriptor student_descriptor = match_subject->GetDescriptor();
+        for ( const auto& team : teams.value()) {
+            id_to_distance_kv.emplace_back(
+                    team.GetExternalID(),
+                    DistanceBetweenDescriptors(student_descriptor, team.GetDescriptor())
+            );
+        }
+
+        std::sort(
+            id_to_distance_kv.begin(), id_to_distance_kv.end(),
+            [](const std::pair<common::ID, float>& left, const std::pair<common::ID, float>& right){
+                return right > left;
+            }
+        );
+
+        std::vector<common::ID> return_ids;
+        return_ids.reserve(id_to_distance_kv.size());
+
+        for ( const auto& kv : id_to_distance_kv ) {
+            return_ids.emplace_back(kv.first);
+        }
+
+        return OPT_WITH_STATUS_OK(return_ids);
     }
 
 } // namespace recsys_t2s::database

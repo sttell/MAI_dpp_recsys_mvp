@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <cstring>
 #include <vector>
+#include <cmath>
 
 int hex_value(unsigned char hex_digit)
 {
@@ -72,6 +73,18 @@ namespace recsys_t2s::database {
         Descriptor descriptor;
         std::memcpy(descriptor.data(), bytes.data(), DESCRIPTOR_BYTES);
         return descriptor;
+    }
+
+    float DistanceBetweenDescriptors(const Descriptor& left, const Descriptor& right) {
+
+        float sum{ 0.f };
+
+        for ( size_t i = 0; i < DESCRIPTOR_LENGTH; i++ ) {
+            const float diff = right[i] - left[i];
+            sum += diff * diff;
+        }
+
+        return std::sqrt(sum);
     }
 
 }
