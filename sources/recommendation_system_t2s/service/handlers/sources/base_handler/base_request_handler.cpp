@@ -3,6 +3,7 @@
 #include <Poco/JSON/Object.h>
 
 #include <utility>
+#include <optional>
 
 using RequestHandlerNs = recsys_t2s::handlers::IRequestHandler;
 
