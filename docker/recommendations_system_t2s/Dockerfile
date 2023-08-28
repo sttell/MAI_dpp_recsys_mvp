@@ -39,7 +39,9 @@ RUN git clone https://github.com/sttell/MAI_dpp_recsys_mvp.git -b devel && \
     cmake .. && \
     make -j ${BUILD_CORES_COUNT}
 
+RUN ls -la /MAI_dpp_recsys_mvp/sources/build && echo "" && echo "" && ls -la /MAI_dpp_recsys_mvp/sources/build/recommendation_system_t2s
+
 ENTRYPOINT [ \
-    "/MAI_dpp_recsys_mvp/sources/build/recommendations_system_t2s/recommendation_system_t2s_service", \
-    "/MAI_dpp_recsys_mvp/sources/build/recommendations_system_t2s/recommendations_system_t2s_data/server_config.json" \
+    "/MAI_dpp_recsys_mvp/sources/build/recommendation_system_t2s/recommendations_system_t2s", \
+    "/MAI_dpp_recsys_mvp/sources/recommendation_system_t2s/service/assets/server_config.json" \
 ]

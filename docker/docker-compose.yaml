@@ -17,10 +17,15 @@ services:
       --default-authentication-plugin=mysql_native_password
       --general-log=ON
       --log-queries-not-using-indexes=ON
+    healthcheck:
+      test: "mariadb --user admin --password=admin t2s_db_node_01 --execute \"SHOW DATABASES;\""
+      timeout: 20s
+      retries: 5
     networks:
-      - arch-network
+      - recsys-network
     ports:
-      - 3360:3306
+      - "3360:3306"
+
     volumes:
       - recommendations-t2s-service-db-node-01-data:/var/lib/mysql
 
@@ -30,16 +35,17 @@ services:
       dockerfile: Dockerfile
     container_name: recommendations_system_t2s
     ports:
-      - 8080:8080
+      - "8080:8080"
     networks:
-      - arch-network
+      - recsys-network
     depends_on:
-      - recommendations-t2s-service-db-node-01
+      recommendations-t2s-service-db-node-01:
+        condition: service_healthy
 
 volumes:
   recommendations-t2s-service-db-node-01-data:
 
 networks:
-  arch-network:
+  recsys-network:
     driver: "bridge"
     external: false
