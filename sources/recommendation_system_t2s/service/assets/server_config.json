@@ -1,11 +1,11 @@
 {
   "network": {
     "ip_address": "127.0.0.1",
-    "port": 8081
+    "port": 8080
   },
   "database": {
-    "host_ip": "0.0.0.0",
-    "port": 3360,
+    "host_ip": "recommendations-t2s-service-db-node-01",
+    "port": 3306,
     "login": "admin",
     "password": "admin",
     "database": "t2s_db_node_01"

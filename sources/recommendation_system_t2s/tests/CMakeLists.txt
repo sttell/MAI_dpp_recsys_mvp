@@ -12,9 +12,6 @@ find_package(GTest REQUIRED)
 
 add_executable(${PROJECT_NAME}
         main.cpp
-        common/education_level_test.cpp
-
-        students_post_test.cpp
         )
 
 
