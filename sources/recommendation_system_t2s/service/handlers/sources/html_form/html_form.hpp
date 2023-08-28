@@ -6,6 +6,7 @@
 #include "Poco/JSON/Array.h"
 
 #include <string>
+#include <optional>
 
 using HTMLFormBase = Poco::Net::HTMLForm;
 

@@ -4,6 +4,7 @@
 #include "handlers/sources/base_handler/base_request_handler.hpp"
 
 #include <string>
+#include <optional>
 
 namespace recsys_t2s::handlers::impl {
 

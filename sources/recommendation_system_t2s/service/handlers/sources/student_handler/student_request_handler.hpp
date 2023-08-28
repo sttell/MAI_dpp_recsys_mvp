@@ -6,6 +6,7 @@
 #include "handlers/sources/html_form/html_form.hpp"
 
 #include <string>
+#include <optional>
 
 namespace recsys_t2s::handlers::impl {
 
