@@ -10,6 +10,8 @@
 #include "handlers/include/handlers/request_handler_factory.hpp"
 
 #include <iostream>
+#include <chrono>
+#include <thread>
 
 using ServerSocket = Poco::Net::ServerSocket;
 using SocketAddress = Poco::Net::SocketAddress;
@@ -17,6 +19,15 @@ using HTTPServer = Poco::Net::HTTPServer;
 using HTTPServerParams = Poco::Net::HTTPServerParams;
 using DateTimeFormat = Poco::DateTimeFormat;
 
+#define SAFE_TRY try {
+#define SAFE_CATCH(error_while_prefix) \
+    } catch (const Poco::Exception& e) { \
+        std::cerr << error_while_prefix << e.displayText() << std::endl; \
+        return EXIT_FAILURE;                               \
+    } catch (const std::exception& e) {\
+        std::cerr << error_while_prefix << e.what() << std::endl;        \
+        return EXIT_FAILURE;           \
+    }
 
 namespace recsys_t2s {
 
@@ -29,36 +40,66 @@ namespace recsys_t2s {
 
     int HTTPWebServer::main( const std::vector<std::string>& t_args ) {
 
+        /**
+         * Для корректной инициализации требуется минимум 1 аргумент - путь к конфигурационному файлу.
+         * Если он не задан, то возвращается код 1 и программа завершается.
+         */
         if( t_args.empty()) {
-            std::cerr << "Error. Application required the service config path as first command line argument."
-                      << std::endl;
+            std::cerr <<
+                "Error. Application required the service config path as first command line argument."
+                << std::endl;
             return EXIT_FAILURE;
         }
 
-        m_Config = std::make_shared<config::Config>(t_args.at(0));
+        /**
+         * Инициализация конфига из файла.
+         */
+        SAFE_TRY
+            m_Config = std::make_shared<config::Config>(t_args.at(0));
+        SAFE_CATCH("Error while loading config: ");
 
-        const std::shared_ptr<config::NetworkConfig> network_config = m_Config->GetNetworkConfig();
-        if( !database::Database::Instance()->IsConnected()) {
-            database::Database::Instance()->BindConfig(m_Config->GetDatabaseConfig());
-            bool result = database::Database::Instance()->TryConnect();
-            if( !result ) {
-                std::cerr << "Failed connect to database." << std::endl;
-                return EXIT_DATAERR;
+
+        /**
+         * Попытка подключения к базе данных.
+         * Конфигурируется в database config.
+         * Выполняет несколько попыток подключения с заданным интервалом пока не подключится к БД.
+         */
+        SAFE_TRY
+
+            DATABASE_INST->BindConfig(m_Config->GetDatabaseConfig());
+            DATABASE_INST->TryConnect();
+            if ( !DATABASE_INST->IsConnected() ) {
+                std::cout << "Failed connect to database." << std::endl;
+                return EXIT_FAILURE;
             }
-        }
 
-        database::RecSysDatabase::Init();
+        SAFE_CATCH("Error while trying connect to database: ");
 
-        std::cout << "Connected." << std::endl;
+        SAFE_TRY
+            database::RecSysDatabase::Init();
+        SAFE_CATCH("Error while init Recomendation System database: ");
 
-        ServerSocket svs( SocketAddress(*network_config->GetIpAddress(), *network_config->GetPort()));
-        HTTPServer srv(new handlers::RequestHandlerFactory(DateTimeFormat::SORTABLE_FORMAT), svs, new HTTPServerParams);
+        std::unique_ptr<ServerSocket> server_socket;
+        std::unique_ptr<HTTPServer> server;
+        SAFE_TRY
+            server_socket = std::make_unique<ServerSocket>(
+                        SocketAddress(
+                                *m_Config->GetNetworkConfig()->GetIpAddress(),
+                                *m_Config->GetNetworkConfig()->GetPort()
+                        )
+            );
+            server = std::make_unique<HTTPServer>(
+                    new handlers::RequestHandlerFactory(DateTimeFormat::SORTABLE_FORMAT),
+                    *server_socket,
+                    new HTTPServerParams);
 
-        std::cout << "Application will started as " << svs.address().toString() << std::endl;
+        SAFE_CATCH("Error while init server: ")
 
-        srv.start();
+        std::cout << "Application will started as " << server_socket->address().toString() << std::endl;
+
+        server->start();
         waitForTerminationRequest();
-        srv.stop();
+        server->stop();
 
         return Application::EXIT_OK;
     }

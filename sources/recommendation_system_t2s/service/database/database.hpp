@@ -15,6 +15,8 @@ using SessionPool = Poco::Data::SessionPool;
 using Poco::Data::Session;
 using Poco::Data::Statement;
 
+#define DATABASE_INST recsys_t2s::database::Database::Instance()
+
 #define START_STATEMENT_SECTION try {
 
 #define END_STATEMENT_SECTION_VOID \

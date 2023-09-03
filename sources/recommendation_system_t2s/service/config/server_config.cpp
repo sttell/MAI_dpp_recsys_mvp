@@ -14,6 +14,8 @@ namespace {
     constexpr unsigned int kDefaultPort = 8080;
     constexpr const char*  kDefaultDB_Host = "127.0.0.1";
     constexpr unsigned int kDefaultDB_Port = 3360;
+    constexpr unsigned int kDefaultDB_TryConnectCount = 10;
+    constexpr unsigned int kDefaultDB_TryConnectDelay = 1000;
     constexpr const char*  kDefaultDB_Login = "admin";
     constexpr const char*  kDefaultDB_Password = "admin";
     constexpr const char*  kDefaultDB_Database = "archdb";
@@ -82,7 +84,10 @@ namespace recsys_t2s::config {
             m_Port(std::make_shared<unsigned int>(kDefaultDB_Port)),
             m_Login(std::make_shared<std::string>(kDefaultDB_Login)),
             m_Password(std::make_shared<std::string>(kDefaultDB_Password)),
-            m_DatabaseName(std::make_shared<std::string>(kDefaultDB_Database)) { /* Empty */ }
+            m_DatabaseName(std::make_shared<std::string>(kDefaultDB_Database)),
+            m_TryConnectDelay(std::make_shared<unsigned int>(kDefaultDB_TryConnectDelay)),
+            m_TryConnectCount(std::make_shared<unsigned int>(kDefaultDB_TryConnectCount))
+            { /* Empty */ }
 
     DatabaseConfig::DatabaseConfig(Poco::JSON::Object &json_root) noexcept: DatabaseConfig() {
         m_HostIP = GetSharedFromNode<std::string>(json_root, m_KeyHostIP);
@@ -90,6 +95,8 @@ namespace recsys_t2s::config {
         m_Login = GetSharedFromNode<std::string>(json_root, m_KeyLogin);
         m_Password = GetSharedFromNode<std::string>(json_root, m_KeyPassword);
         m_DatabaseName = GetSharedFromNode<std::string>(json_root, m_KeyDatabaseName);
+        m_TryConnectDelay = GetSharedFromNode<unsigned int>(json_root, m_KeyTryConnectDelay);
+        m_TryConnectCount = GetSharedFromNode<unsigned int>(json_root, m_KeyTryConnectCount);
     }
 
 } // namespace recsys_t2s::config

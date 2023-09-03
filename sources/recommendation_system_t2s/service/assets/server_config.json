@@ -8,6 +8,8 @@
     "port": 3306,
     "login": "admin",
     "password": "admin",
-    "database": "t2s_db_node_01"
+    "database": "t2s_db_node_01",
+    "try_connect_delay": 1000,
+    "try_connect_count": 10
   }
 }

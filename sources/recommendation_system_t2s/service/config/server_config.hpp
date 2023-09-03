@@ -31,6 +31,8 @@ namespace recsys_t2s::config {
         DefineConfigField(std::string,  Login,        "login"   )
         DefineConfigField(std::string,  Password,     "password")
         DefineConfigField(std::string,  DatabaseName, "database")
+        DefineConfigField(unsigned int, TryConnectDelay, "try_connect_delay")
+        DefineConfigField(unsigned int, TryConnectCount, "try_connect_count")
 
     };
 
